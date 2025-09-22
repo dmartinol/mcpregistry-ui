@@ -31,6 +31,47 @@ export interface RegistryServer {
 
   /** Documentation URL */
   documentation?: string;
+
+  // Additional fields for enhanced UI
+  /** Server tier (Official, Community, etc.) */
+  tier?: string;
+
+  /** Transport protocol (stdio, sse, streamable-http, etc.) */
+  transport?: string;
+
+  /** List of available tools */
+  tools?: string[];
+
+  /** Server status (Active, Running, etc.) */
+  status?: string;
+
+  /** Endpoint URL for deployed servers */
+  endpoint_url?: string;
+
+  /** Whether the deployed server is ready */
+  ready?: boolean;
+
+  /** Kubernetes namespace for deployed servers */
+  namespace?: string;
+
+  // Enhanced details available from individual server endpoint (based on real registry API)
+  /** Environment variables configuration */
+  env_vars?: Array<{
+    name: string;
+    description: string;
+    required: boolean;
+    secret?: boolean;
+  }>;
+
+  /** Server metadata and statistics */
+  metadata?: {
+    last_updated?: string;
+    pulls?: number;
+    stars?: number;
+  };
+
+  /** Repository URL (more specific than generic repository field) */
+  repository_url?: string;
 }
 
 /**
@@ -47,10 +88,10 @@ export const registryServerSchema = Joi.object<RegistryServer>({
     }),
 
   image: Joi.string()
-    .pattern(/^[a-z0-9.\-\/]+:[a-z0-9.\-]+$/i)
+    .pattern(/^[a-z0-9.\-\/]+(?::[a-z0-9.\-]+)?$/i)
     .required()
     .messages({
-      'string.pattern.base': 'Image must be a valid container image reference (registry/image:tag)'
+      'string.pattern.base': 'Image must be a valid container image reference (registry/image[:tag])'
     }),
 
   version: Joi.string()
@@ -98,7 +139,28 @@ export const registryServerSchema = Joi.object<RegistryServer>({
     .optional()
     .messages({
       'string.uri': 'Documentation must be a valid URL'
+    }),
+
+  // Additional fields for enhanced UI
+  tier: Joi.string().optional(),
+  transport: Joi.string().optional(),
+  tools: Joi.array().items(Joi.string()).optional(),
+  status: Joi.string().optional(),
+  endpoint_url: Joi.string().uri().optional(),
+  ready: Joi.boolean().optional(),
+  namespace: Joi.string().optional(),
+
+  // Enhanced fields from individual server endpoint
+  env_vars: Joi.array().items(
+    Joi.object({
+      name: Joi.string().required(),
+      description: Joi.string().required(),
+      required: Joi.boolean().required(),
+      secret: Joi.boolean().optional()
     })
+  ).optional(),
+  metadata: Joi.object().unknown(true).optional(),
+  repository_url: Joi.string().uri().optional()
 });
 
 /**

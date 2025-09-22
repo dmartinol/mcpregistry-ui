@@ -1,0 +1,228 @@
+openapi: 3.0.3
+info:
+  title: Registry Server Details API
+  description: API contracts for registry server details view feature
+  version: 1.0.0
+
+paths:
+  /api/v1/registries/{registryId}/servers:
+    get:
+      summary: Get available servers for a registry
+      description: Fetch all server definitions from the registry source
+      parameters:
+        - name: registryId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          description: Registry identifier
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter servers by tags
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum number of servers to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of servers to skip
+      responses:
+        '200':
+          description: List of available servers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RegistryServer'
+                  total:
+                    type: integer
+                    description: Total number of servers
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                required: [servers, total, limit, offset]
+        '404':
+          description: Registry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/registries/{registryId}/deployed-servers:
+    get:
+      summary: Get deployed servers for a registry
+      description: Fetch all MCPServer instances deployed for this registry
+      parameters:
+        - name: registryId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          description: Registry identifier
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Pending, Running, Failed, Terminating]
+          description: Filter by deployment status
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by Kubernetes namespace
+      responses:
+        '200':
+          description: List of deployed servers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeployedServer'
+                  total:
+                    type: integer
+                required: [servers, total]
+        '404':
+          description: Registry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    RegistryServer:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 63
+          description: Server identifier
+        image:
+          type: string
+          pattern: '^[a-z0-9.\-\/]+:[a-z0-9.\-]+$'
+          description: Container image reference
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+'
+          description: Server version (semantic versioning)
+        description:
+          type: string
+          maxLength: 500
+          description: Human-readable description
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 32
+          description: Classification tags
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: MCP capabilities
+        author:
+          type: string
+          maxLength: 100
+          description: Server author/maintainer
+        repository:
+          type: string
+          format: uri
+          description: Source code repository URL
+        documentation:
+          type: string
+          format: uri
+          description: Documentation URL
+      required: [name, image, tags]
+
+    DeployedServer:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          description: Kubernetes resource name
+        name:
+          type: string
+          description: Server name from spec
+        registryRef:
+          type: string
+          description: Registry reference
+        image:
+          type: string
+          description: Deployed container image
+        version:
+          type: string
+          description: Deployed version
+        status:
+          type: string
+          enum: [Pending, Running, Failed, Terminating]
+          description: Deployment status
+        endpoint:
+          type: string
+          format: uri
+          description: Service endpoint URL
+        createdAt:
+          type: string
+          format: date-time
+          description: Deployment timestamp
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Last status update
+        namespace:
+          type: string
+          description: Kubernetes namespace
+        uid:
+          type: string
+          format: uuid
+          description: Kubernetes UID
+      required: [id, name, registryRef, image, status, createdAt, lastUpdated, namespace, uid]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: array
+          items:
+            type: string
+          description: Additional error details
+      required: [error]

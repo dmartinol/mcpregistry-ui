@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -31,6 +32,11 @@ export const RegistryList: React.FC<RegistryListProps> = ({
   onSync,
   onDelete,
 }) => {
+  const navigate = useNavigate();
+
+  const handleViewDetails = (registryId: string) => {
+    navigate(`/registries/${registryId}`);
+  };
   const getStatusColor = (status: string): 'success' | 'error' | 'warning' | 'info' => {
     switch (status) {
       case 'active':
@@ -76,9 +82,26 @@ export const RegistryList: React.FC<RegistryListProps> = ({
             <TableRow key={registry.id} hover>
               <TableCell>
                 <Box>
-                  <Typography variant="subtitle2">{registry.name}</Typography>
+                  <Typography
+                    variant="subtitle2"
+                    component="button"
+                    onClick={() => handleViewDetails(registry.id)}
+                    sx={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'primary.main',
+                      textDecoration: 'none',
+                      '&:hover': {
+                        textDecoration: 'underline',
+                      },
+                    }}
+                  >
+                    {registry.name}
+                  </Typography>
                   {registry.description && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" display="block">
                       {registry.description}
                     </Typography>
                   )}
@@ -108,7 +131,10 @@ export const RegistryList: React.FC<RegistryListProps> = ({
               </TableCell>
               <TableCell align="right">
                 <Tooltip title="View Details">
-                  <IconButton size="small">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleViewDetails(registry.id)}
+                  >
                     <ViewIcon />
                   </IconButton>
                 </Tooltip>

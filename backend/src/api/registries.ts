@@ -200,8 +200,8 @@ router.get('/:registryId/deployed-servers', async (req: Request, res: Response):
       return;
     }
 
-    // Validate query parameters
-    const { error, value } = deployedServersQuerySchema.validate(req.query);
+    // Validate query parameters for registry server service
+    const { error, value } = registryServersQuerySchema.validate(req.query);
     if (error) {
       res.status(400).json({
         error: 'Invalid request parameters',
@@ -210,8 +210,8 @@ router.get('/:registryId/deployed-servers', async (req: Request, res: Response):
       return;
     }
 
-    // Fetch deployed servers
-    const result = await deployedServerService.getDeployedServers(req.params.registryId, value);
+    // Fetch deployed servers from registry API
+    const result = await registryServerService.getDeployedServers(req.params.registryId, value);
     res.json(result);
   } catch (error) {
     console.error('Error fetching deployed servers:', error);
@@ -220,6 +220,54 @@ router.get('/:registryId/deployed-servers', async (req: Request, res: Response):
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
+  }
+});
+
+// GET /api/v1/registries/:registryId/servers/:serverName
+router.get('/:registryId/servers/:serverName', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Fetch specific server details
+    const server = await registryServerService.getServerByName(req.params.registryId, req.params.serverName);
+    if (!server) {
+      res.status(404).json({ error: 'Server not found' });
+      return;
+    }
+
+    res.json(server);
+  } catch (error) {
+    console.error('Error fetching server details:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/registries/:registryId/servers/deployed/:serverName
+router.get('/:registryId/servers/deployed/:serverName', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Fetch specific deployed server details
+    const deployedServer = await registryServerService.getDeployedServerByName(req.params.registryId, req.params.serverName);
+    if (!deployedServer) {
+      res.status(404).json({ error: 'Deployed server not found' });
+      return;
+    }
+
+    res.json(deployedServer);
+  } catch (error) {
+    console.error('Error fetching deployed server details:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
