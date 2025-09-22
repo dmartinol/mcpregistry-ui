@@ -1,0 +1,485 @@
+openapi: 3.0.3
+info:
+  title: ToolHive Registry Management API - Instances
+  version: 1.0.0
+  description: API for managing deployed server instances
+
+paths:
+  /api/v1/instances:
+    get:
+      summary: List all instances
+      description: Retrieve all deployed instances across all namespaces (subject to RBAC)
+      parameters:
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by Kubernetes namespace
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, failed, terminated]
+        - name: serverId
+          in: query
+          schema:
+            type: string
+          description: Filter by originating server
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Instance'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/instances/{instanceId}:
+    get:
+      summary: Get instance details
+      description: Retrieve detailed information about a specific instance
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Instance details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceDetails'
+        '404':
+          description: Instance not found
+        '403':
+          description: Access denied to instance namespace
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Terminate instance
+      description: Terminate a running instance and clean up resources
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Termination initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  terminationId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [initiated]
+        '404':
+          description: Instance not found
+        '403':
+          description: Access denied to terminate instance
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/instances/{instanceId}/scale:
+    post:
+      summary: Scale instance
+      description: Change the number of replicas for an instance
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScaleRequest'
+      responses:
+        '202':
+          description: Scaling initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scaleId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [initiated]
+                  targetReplicas:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Instance not found
+        '403':
+          description: Access denied to scale instance
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/instances/{instanceId}/logs:
+    get:
+      summary: Get instance logs
+      description: Retrieve logs from instance containers
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: container
+          in: query
+          schema:
+            type: string
+          description: Specific container name (if multiple)
+        - name: tail
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Number of recent log lines
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Show logs since timestamp
+        - name: follow
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Stream logs in real-time
+      responses:
+        '200':
+          description: Instance logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        level:
+                          type: string
+                        message:
+                          type: string
+                        container:
+                          type: string
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Instance not found
+        '403':
+          description: Access denied to instance logs
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/instances/{instanceId}/metrics:
+    get:
+      summary: Get instance metrics
+      description: Retrieve resource usage and performance metrics
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d]
+            default: 1h
+          description: Time period for metrics
+        - name: resolution
+          in: query
+          schema:
+            type: string
+            enum: [1m, 5m, 15m, 1h]
+            default: 5m
+          description: Metric resolution
+      responses:
+        '200':
+          description: Instance metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceMetrics'
+        '404':
+          description: Instance not found
+        '403':
+          description: Access denied to instance metrics
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    Instance:
+      type: object
+      properties:
+        id:
+          type: string
+        serverId:
+          type: string
+        name:
+          type: string
+        namespace:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, failed, terminated]
+        phase:
+          type: string
+          enum: [deploying, ready, scaling, terminating]
+        replicas:
+          type: object
+          properties:
+            desired:
+              type: integer
+            current:
+              type: integer
+            ready:
+              type: integer
+        deployedAt:
+          type: string
+          format: date-time
+        healthStatus:
+          type: string
+          enum: [healthy, unhealthy, unknown]
+      required:
+        - id
+        - serverId
+        - name
+        - namespace
+        - status
+        - deployedAt
+
+    InstanceDetails:
+      allOf:
+        - $ref: '#/components/schemas/Instance'
+        - type: object
+          properties:
+            configuration:
+              type: object
+              properties:
+                image:
+                  type: string
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                        memory:
+                          type: string
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                        memory:
+                          type: string
+                environment:
+                  type: object
+                  additionalProperties:
+                    type: string
+                ports:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      port:
+                        type: integer
+                      targetPort:
+                        type: integer
+                      protocol:
+                        type: string
+            resourceUsage:
+              type: object
+              properties:
+                cpu:
+                  type: object
+                  properties:
+                    current:
+                      type: string
+                    percentage:
+                      type: number
+                memory:
+                  type: object
+                  properties:
+                    current:
+                      type: string
+                    percentage:
+                      type: number
+                network:
+                  type: object
+                  properties:
+                    ingress:
+                      type: string
+                    egress:
+                      type: string
+            events:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  type:
+                    type: string
+                    enum: [Normal, Warning]
+                  reason:
+                    type: string
+                  message:
+                    type: string
+
+    ScaleRequest:
+      type: object
+      properties:
+        replicas:
+          type: integer
+          minimum: 0
+          maximum: 10
+      required:
+        - replicas
+
+    InstanceMetrics:
+      type: object
+      properties:
+        instanceId:
+          type: string
+        period:
+          type: string
+        resolution:
+          type: string
+        metrics:
+          type: object
+          properties:
+            cpu:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  value:
+                    type: number
+                    description: CPU usage percentage
+            memory:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  value:
+                    type: number
+                    description: Memory usage in bytes
+            network:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  ingress:
+                    type: number
+                    description: Ingress bytes per second
+                  egress:
+                    type: number
+                    description: Egress bytes per second
+            requests:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  count:
+                    type: number
+                    description: Request count per minute
+                  responseTime:
+                    type: number
+                    description: Average response time in ms
+                  errorRate:
+                    type: number
+                    description: Error rate percentage
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: array
+                items:
+                  type: string
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string

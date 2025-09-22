@@ -1,0 +1,27 @@
+{
+  "name": "toolhive-registry-ui",
+  "version": "1.0.0",
+  "description": "ToolHive Registry Management Application",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "test": "npm run test --workspace=backend && npm run test --workspace=frontend",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "format": "npm run format --workspace=backend && npm run format --workspace=frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cypress": "^13.6.1",
+    "@cypress/code-coverage": "^3.12.14"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

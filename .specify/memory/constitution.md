@@ -1,50 +1,51 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+Version change: N/A → 1.0.0
+Added sections: Core Principles (5 principles), Quality Standards, Development Workflow, Governance
+Principles: Code Quality (test-driven), Testing Standards (comprehensive), UX Consistency (design system), Performance Requirements (response times), Security & Compliance (data protection)
+Templates requiring updates: ✅ All templates aligned with new principles
+Follow-up TODOs: None - all placeholders filled
+-->
+
+# MCP Registry UI Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Code Quality (NON-NEGOTIABLE)
+All code MUST follow test-driven development: tests written first, implementation second. Code MUST be maintainable with clear naming, proper documentation, and modular architecture. Static analysis tools MUST pass without warnings. Code reviews MUST verify adherence to style guides and architectural patterns.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+**Rationale**: High-quality code reduces technical debt, improves maintainability, and ensures reliability in the MCP registry interface that developers depend on.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Testing Standards
+Comprehensive testing is MANDATORY: unit tests for all business logic, integration tests for API contracts, end-to-end tests for critical user workflows. Test coverage MUST be above 90%. Tests MUST be deterministic and fast (<5s for unit tests, <30s for integration tests). Contract testing MUST validate MCP protocol compliance.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale**: The registry UI is a critical interface for MCP server discovery; comprehensive testing ensures reliability and protocol compliance.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. User Experience Consistency
+All UI components MUST follow the established design system. User interactions MUST be predictable and accessible (WCAG 2.1 AA compliance). Loading states, error messages, and feedback MUST be consistent across all features. No feature ships without UX review and user testing validation.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**Rationale**: Consistent UX reduces cognitive load for developers browsing the registry and ensures accessibility for all users.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Performance Requirements
+API responses MUST complete within 200ms (p95). UI interactions MUST feel responsive (<100ms feedback). Page loads MUST complete within 2 seconds on 3G networks. Memory usage MUST remain under 100MB for typical user sessions. Performance budgets MUST be monitored and enforced in CI/CD.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Rationale**: Fast performance is essential for developer productivity when searching and discovering MCP servers.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Security & Compliance
+All user data MUST be encrypted in transit and at rest. Authentication MUST use secure protocols (OAuth 2.0/OIDC). Input validation MUST prevent injection attacks. Security headers MUST be properly configured. Regular security audits MUST be conducted and vulnerabilities addressed within 48 hours.
+
+**Rationale**: Registry data and user information must be protected to maintain trust in the MCP ecosystem.
+
+## Quality Standards
+
+Code MUST pass all automated quality gates: linting (ruff/black for Python), type checking (mypy), security scanning (bandit), and dependency vulnerability checks. Documentation MUST be maintained for all public APIs and user-facing features. All changes MUST be peer-reviewed by at least one team member.
+
+## Development Workflow
+
+All features MUST follow the specification-driven development process: feature specification → planning → implementation → testing → deployment. Pull requests MUST include tests and pass all CI checks. Breaking changes MUST be documented with migration guides. Feature flags MUST be used for experimental functionality.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Any deviations MUST be explicitly justified in planning documentation and approved by the team. Constitution amendments require consensus approval and comprehensive impact analysis. All team members are responsible for enforcing these principles in code reviews and architectural decisions.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-01-19 | **Last Amended**: 2025-01-19
