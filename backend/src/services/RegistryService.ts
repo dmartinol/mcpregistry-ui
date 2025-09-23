@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import {
   Registry,
   CreateRegistryRequest,
@@ -6,47 +5,43 @@ import {
   RegistryDetails,
   RegistryListResponse,
 } from '../models/Registry';
+import { KubernetesClient, MCPRegistry } from './KubernetesClient';
 
 export class RegistryService {
-  private registries: Map<string, RegistryDetails> = new Map();
+  private k8sClient: KubernetesClient;
+
+  constructor(namespace?: string) {
+    this.k8sClient = new KubernetesClient(namespace);
+  }
 
   async createRegistry(data: CreateRegistryRequest): Promise<Registry> {
     // Check for duplicate names
-    for (const registry of this.registries.values()) {
-      if (registry.name === data.name) {
-        throw new Error('Registry with this name already exists');
-      }
+    const existingRegistries = await this.k8sClient.getMCPRegistries();
+    const duplicateRegistry = existingRegistries.find(r => r.metadata.name === data.name);
+    if (duplicateRegistry) {
+      throw new Error('Registry with this name already exists');
     }
 
-    const now = new Date();
-    const registry: RegistryDetails = {
-      id: uuidv4(),
-      name: data.name,
-      url: data.url,
-      description: data.description,
-      status: 'syncing',
-      serverCount: 0,
-      createdAt: now,
-      updatedAt: now,
-      metadata: {},
-      authConfig: data.authConfig || { type: 'none' },
-      syncHistory: [
-        {
-          timestamp: now,
-          status: 'success',
-          message: 'Registry created',
-        },
-      ],
+    // Create MCPRegistry object
+    const mcpRegistry: Partial<MCPRegistry> = {
+      metadata: {
+        name: data.name,
+        namespace: this.k8sClient.getCurrentNamespace(),
+        creationTimestamp: new Date().toISOString(),
+        uid: '',
+      },
+      spec: {
+        url: data.url,
+        description: data.description,
+        auth: data.authConfig || { type: 'none' },
+      },
     };
 
-    this.registries.set(registry.id, registry);
+    // Create in Kubernetes
+    const createdRegistry = await this.k8sClient.createMCPRegistry(mcpRegistry);
 
-    // Simulate async sync process
-    this.triggerSync(registry.id).catch(console.error);
-
-    // Return basic registry info (without sync history)
-    const { syncHistory, ...basicRegistry } = registry;
-    return basicRegistry;
+    // Convert to our Registry model
+    return await this.k8sClient.mcpRegistryToRegistry(createdRegistry);
   }
 
   async getRegistries(
@@ -54,7 +49,13 @@ export class RegistryService {
     limit: number = 20,
     offset: number = 0
   ): Promise<RegistryListResponse> {
-    let registries = Array.from(this.registries.values());
+    // Get MCPRegistries from Kubernetes
+    const mcpRegistries = await this.k8sClient.getMCPRegistries();
+
+    // Convert to our Registry model
+    let registries = await Promise.all(mcpRegistries.map(mcpRegistry =>
+      this.k8sClient.mcpRegistryToRegistry(mcpRegistry)
+    ));
 
     // Filter by status if provided
     if (status) {
@@ -63,9 +64,7 @@ export class RegistryService {
 
     // Apply pagination
     const total = registries.length;
-    const paginatedRegistries = registries
-      .slice(offset, offset + limit)
-      .map(({ syncHistory, ...registry }) => registry); // Remove sync history from list view
+    const paginatedRegistries = registries.slice(offset, offset + limit);
 
     return {
       registries: paginatedRegistries,
@@ -76,120 +75,98 @@ export class RegistryService {
   }
 
   async getRegistryById(id: string): Promise<RegistryDetails | null> {
-    const registry = this.registries.get(id);
-    return registry || null;
+    // Get MCPRegistry from Kubernetes by name (id is the name)
+    const mcpRegistry = await this.k8sClient.getMCPRegistry(id);
+    if (!mcpRegistry) {
+      return null;
+    }
+
+    // Convert to our RegistryDetails model
+    return await this.k8sClient.mcpRegistryToRegistryDetails(mcpRegistry);
   }
 
   async updateRegistry(id: string, data: UpdateRegistryRequest): Promise<Registry | null> {
-    const registry = this.registries.get(id);
-    if (!registry) {
+    // Get existing MCPRegistry
+    const existingRegistry = await this.k8sClient.getMCPRegistry(id);
+    if (!existingRegistry) {
       return null;
     }
 
     // Check for duplicate names if name is being updated
-    if (data.name && data.name !== registry.name) {
-      for (const [otherId, otherRegistry] of this.registries.entries()) {
-        if (otherId !== id && otherRegistry.name === data.name) {
-          throw new Error('Registry with this name already exists');
-        }
+    if (data.name && data.name !== existingRegistry.metadata.name) {
+      const allRegistries = await this.k8sClient.getMCPRegistries();
+      const duplicateRegistry = allRegistries.find(r =>
+        r.metadata.name === data.name && r.metadata.name !== id
+      );
+      if (duplicateRegistry) {
+        throw new Error('Registry with this name already exists');
       }
     }
 
-    // Update fields
-    const updatedRegistry: RegistryDetails = {
-      ...registry,
-      ...data,
-      updatedAt: new Date(),
+    // Create update object
+    const updateData: Partial<MCPRegistry> = {
+      spec: {
+        ...existingRegistry.spec,
+        ...(data.url && { url: data.url }),
+        ...(data.description && { description: data.description }),
+        ...(data.authConfig && { auth: data.authConfig }),
+      },
     };
 
-    this.registries.set(id, updatedRegistry);
+    // Update in Kubernetes
+    const updatedRegistry = await this.k8sClient.updateMCPRegistry(id, updateData);
 
-    // Return basic registry info
-    const { syncHistory, ...basicRegistry } = updatedRegistry;
-    return basicRegistry;
+    // Convert to our Registry model
+    return await this.k8sClient.mcpRegistryToRegistry(updatedRegistry);
   }
 
   async deleteRegistry(id: string): Promise<boolean> {
-    const registry = this.registries.get(id);
+    // Check if registry exists
+    const registry = await this.k8sClient.getMCPRegistry(id);
     if (!registry) {
       return false;
     }
 
-    // Check if registry has active instances (would be implemented with InstanceService)
-    // For now, allow deletion
+    // Check if registry has active servers
+    const servers = await this.k8sClient.getMCPServers(id);
+    if (servers.length > 0) {
+      throw new Error('Cannot delete registry with active servers. Delete all servers first.');
+    }
 
-    this.registries.delete(id);
+    // Delete from Kubernetes
+    await this.k8sClient.deleteMCPRegistry(id);
     return true;
   }
 
   async syncRegistry(id: string): Promise<{ syncId: string; status: string } | null> {
-    const registry = this.registries.get(id);
+    // Check if registry exists
+    const registry = await this.k8sClient.getMCPRegistry(id);
     if (!registry) {
       return null;
     }
 
     // Check if already syncing
-    if (registry.status === 'syncing') {
+    if (registry.status?.phase === 'Syncing') {
       throw new Error('Sync already in progress');
     }
 
-    const syncId = uuidv4();
-
-    // Update status to syncing
-    registry.status = 'syncing';
-    registry.updatedAt = new Date();
-    this.registries.set(id, registry);
-
-    // Trigger async sync
-    this.triggerSync(id).catch(console.error);
+    // Trigger sync by updating annotation
+    await this.k8sClient.triggerMCPRegistrySync(id);
 
     return {
-      syncId,
+      syncId: `sync-${Date.now()}`,
       status: 'initiated',
     };
   }
 
-  private async triggerSync(id: string): Promise<void> {
-    const registry = this.registries.get(id);
-    if (!registry) {
-      return;
-    }
 
-    try {
-      // Simulate sync delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Simulate fetching server count (would make HTTP request to registry.url)
-      const serverCount = Math.floor(Math.random() * 50) + 10;
-
-      // Update registry with sync results
-      registry.status = 'active';
-      registry.serverCount = serverCount;
-      registry.lastSyncAt = new Date();
-      registry.updatedAt = new Date();
-      registry.syncHistory.push({
-        timestamp: new Date(),
-        status: 'success',
-        message: `Synced ${serverCount} servers`,
-      });
-
-      this.registries.set(id, registry);
-    } catch (error) {
-      // Handle sync failure
-      registry.status = 'error';
-      registry.updatedAt = new Date();
-      registry.syncHistory.push({
-        timestamp: new Date(),
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Sync failed',
-      });
-
-      this.registries.set(id, registry);
-    }
+  // Get current namespace
+  getCurrentNamespace(): string {
+    return this.k8sClient.getCurrentNamespace();
   }
 
-  // For testing purposes
-  async clear(): Promise<void> {
-    this.registries.clear();
+  // Set namespace for operations
+  setNamespace(namespace: string): void {
+    this.k8sClient.setNamespace(namespace);
   }
 }
