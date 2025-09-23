@@ -279,8 +279,9 @@ export class KubernetesClient {
   }
 
   // Helper method to convert MCPRegistry to our Registry model
-  mcpRegistryToRegistry(mcpRegistry: MCPRegistry): Registry {
+  async mcpRegistryToRegistry(mcpRegistry: MCPRegistry): Promise<Registry> {
     const status = this.mapMCPPhaseToStatus(mcpRegistry.status?.phase);
+    const actualServerCount = await this.getActualServerCount(mcpRegistry);
 
     return {
       id: mcpRegistry.metadata.name,
@@ -288,8 +289,8 @@ export class KubernetesClient {
       url: (mcpRegistry.status as any)?.apiEndpoint || mcpRegistry.spec.url || '',
       description: mcpRegistry.spec.description,
       status,
-      serverCount: mcpRegistry.status?.serverCount || 0,
-      lastSyncAt: mcpRegistry.status?.lastSyncTime ? new Date(mcpRegistry.status.lastSyncTime) : undefined,
+      serverCount: actualServerCount,
+      lastSyncAt: mcpRegistry.status?.lastSync ? new Date(mcpRegistry.status.lastSync) : undefined,
       createdAt: new Date(mcpRegistry.metadata.creationTimestamp),
       updatedAt: new Date(mcpRegistry.metadata.creationTimestamp),
       metadata: {
@@ -301,9 +302,56 @@ export class KubernetesClient {
     };
   }
 
+  // Helper method to get actual server count from registry API
+  private async getActualServerCount(mcpRegistry: MCPRegistry): Promise<number> {
+    try {
+      const apiEndpoint = (mcpRegistry.status as any)?.apiEndpoint || mcpRegistry.spec.url;
+      if (!apiEndpoint) {
+        console.warn(`No API endpoint found for registry ${mcpRegistry.metadata.name}`);
+        return 0;
+      }
+
+      // Check if this is a cluster-internal URL and use Kubernetes API proxy
+      if (apiEndpoint.includes('.svc.cluster.local')) {
+        console.log(`Fetching server count via K8s proxy for: ${apiEndpoint}`);
+
+        // Parse the cluster URL to extract service info
+        // Format: http://service-name.namespace.svc.cluster.local:port
+        const urlMatch = apiEndpoint.match(/^https?:\/\/([^.]+)\.([^.]+)\.svc\.cluster\.local:?(\d+)?/);
+        if (!urlMatch) {
+          console.warn(`Invalid cluster URL format: ${apiEndpoint}`);
+          return 0;
+        }
+
+        const [, serviceName, namespace, port] = urlMatch;
+        const servicePort = port || '8080';
+
+        const data = await this.proxyServiceRequest(namespace, serviceName, servicePort, '/v0/servers');
+        return data?.servers?.length || data?.total || 0;
+      } else {
+        // Try direct fetch for external URLs
+        console.log(`Fetching server count directly from: ${apiEndpoint}`);
+        const registryUrl = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+        const serversEndpoint = `${registryUrl}/v0/servers`;
+
+        const response = await fetch(serversEndpoint);
+        if (!response.ok) {
+          console.warn(`Failed to fetch servers from ${serversEndpoint}: ${response.status}`);
+          return 0;
+        }
+
+        const data = await response.json();
+        return data?.servers?.length || data?.total || 0;
+      }
+    } catch (error) {
+      console.warn(`Failed to fetch server count for registry ${mcpRegistry.metadata.name}:`, error);
+      return 0;
+    }
+  }
+
   // Helper method to convert MCPRegistry to our RegistryDetails model
-  mcpRegistryToRegistryDetails(mcpRegistry: MCPRegistry): RegistryDetails {
-    const registry = this.mcpRegistryToRegistry(mcpRegistry);
+  async mcpRegistryToRegistryDetails(mcpRegistry: MCPRegistry): Promise<RegistryDetails> {
+    const registry = await this.mcpRegistryToRegistry(mcpRegistry);
 
     return {
       ...registry,

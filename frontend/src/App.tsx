@@ -63,6 +63,7 @@ interface Server {
   tier?: string;
   transport?: string;
   tools?: string[];
+  tools_count?: number;
   status?: string;
   endpoint_url?: string;
   ready?: boolean;
@@ -242,9 +243,36 @@ const RegistryDashboard: React.FC = () => {
                       </Typography>
 
                       {registry.url && (
-                        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mt: 1 }}>
-                          <strong>URL:</strong> {registry.url}
-                        </Typography>
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '32px', mr: 1 }}>
+                            URL:
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mr: 1
+                            }}
+                          >
+                            {registry.url}
+                          </Typography>
+                          <Tooltip title="Copy URL">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(registry.url);
+                              }}
+                            >
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       )}
 
                       <Typography variant="caption" display="block" sx={{ mt: 2 }}>
@@ -285,6 +313,7 @@ const RegistryDetailPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTabValue, setDialogTabValue] = useState(0);
   const [serverDetailsLoading, setServerDetailsLoading] = useState(false);
 
   useEffect(() => {
@@ -337,6 +366,10 @@ const RegistryDetailPage: React.FC = () => {
     setTabValue(newValue);
   };
 
+  const handleDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setDialogTabValue(newValue);
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -371,6 +404,7 @@ const RegistryDetailPage: React.FC = () => {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedServer(null);
+    setDialogTabValue(0);
   };
 
   if (loading) {
@@ -460,28 +494,50 @@ const RegistryDetailPage: React.FC = () => {
                 {servers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
-                      <Typography
-                        variant="h6"
-                        gutterBottom
-                        sx={{
-                          cursor: 'pointer',
-                          color: 'primary.main',
-                          '&:hover': { textDecoration: 'underline' }
-                        }}
-                        onClick={() => handleServerClick(server, false)}
-                      >
-                        {server.name}
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            cursor: 'pointer',
+                            color: 'primary.main',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={() => handleServerClick(server, false)}
+                        >
+                          {server.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                          {server.tier && (
+                            <Chip
+                              label={server.tier}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          )}
+                          {server.transport && (
+                            <Chip
+                              label={server.transport}
+                              size="small"
+                              color="secondary"
+                              variant="outlined"
+                            />
+                          )}
+                          {server.tags && server.tags.length > 0 && server.tags.slice(0, 2).map((tag) => (
+                            <Chip key={tag} label={tag} size="small" />
+                          ))}
+                        </Box>
+                      </Box>
 
-                      {server.tools && server.tools.length > 0 && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                      {(server.tools_count !== undefined && server.tools_count > 0) && (
+                        <Box sx={{ mb: 1 }}>
                           <Chip
-                            label={`${server.tools.length} tools`}
+                            label={`${server.tools_count} tools`}
                             size="small"
                             color="info"
                             variant="outlined"
                           />
-                        </Typography>
+                        </Box>
                       )}
 
                       {server.description && (
@@ -489,28 +545,6 @@ const RegistryDetailPage: React.FC = () => {
                           {server.description}
                         </Typography>
                       )}
-
-                      <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {server.tier && (
-                          <Chip
-                            label={server.tier}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        )}
-                        {server.transport && (
-                          <Chip
-                            label={server.transport}
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                        )}
-                        {server.tags && server.tags.length > 0 && server.tags.map((tag) => (
-                          <Chip key={tag} label={tag} size="small" />
-                        ))}
-                      </Box>
 
                       <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                         {server.repository && (
@@ -542,28 +576,94 @@ const RegistryDetailPage: React.FC = () => {
                 {deployedServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
-                      <Typography
-                        variant="h6"
-                        gutterBottom
-                        sx={{
-                          cursor: 'pointer',
-                          color: 'primary.main',
-                          '&:hover': { textDecoration: 'underline' }
-                        }}
-                        onClick={() => handleServerClick(server, true)}
-                      >
-                        {server.name}
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            cursor: 'pointer',
+                            color: 'primary.main',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={() => handleServerClick(server, true)}
+                        >
+                          {server.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                          {server.transport && (
+                            <Chip
+                              label={server.transport}
+                              size="small"
+                              color="secondary"
+                              variant="outlined"
+                            />
+                          )}
+                          {server.status && (
+                            <Chip
+                              label={server.status}
+                              size="small"
+                              color={server.status === 'Running' ? 'success' : 'error'}
+                              variant="filled"
+                            />
+                          )}
+                          {server.tags && server.tags.length > 0 && server.tags
+                            .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
+                            .slice(0, 2)
+                            .map((tag) => (
+                              <Chip key={tag} label={tag} size="small" color="primary" />
+                            ))}
+                        </Box>
+                      </Box>
 
-                      {server.tools && server.tools.length > 0 && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1, alignItems: 'center' }}>
+                        {(server.tools_count !== undefined && server.tools_count > 0) && (
                           <Chip
-                            label={`${server.tools.length} tools`}
+                            label={`${server.tools_count} tools`}
                             size="small"
                             color="info"
                             variant="outlined"
                           />
-                        </Typography>
+                        )}
+                        {server.ready !== undefined && (
+                          <Chip
+                            label={server.ready ? 'Ready' : 'Not Ready'}
+                            size="small"
+                            color={server.ready ? 'success' : 'warning'}
+                            variant="filled"
+                          />
+                        )}
+                      </Box>
+
+                      {server.image && (
+                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '45px', mr: 1 }}>
+                            Image:
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mr: 1
+                            }}
+                          >
+                            {server.image}{server.version && `:${server.version}`}
+                          </Typography>
+                          <Tooltip title="Copy Image">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(`${server.image}${server.version ? `:${server.version}` : ''}`);
+                              }}
+                            >
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       )}
 
                       {server.description && (
@@ -573,8 +673,21 @@ const RegistryDetailPage: React.FC = () => {
                       )}
 
                       {server.endpoint_url && (
-                        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, display: 'flex', alignItems: 'center' }}>
-                          <strong>Endpoint:</strong> {server.endpoint_url}
+                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mr: 1
+                            }}
+                          >
+                            {server.endpoint_url}
+                          </Typography>
                           <Tooltip title="Copy Endpoint">
                             <IconButton
                               size="small"
@@ -582,37 +695,12 @@ const RegistryDetailPage: React.FC = () => {
                                 e.stopPropagation();
                                 copyToClipboard(server.endpoint_url!);
                               }}
-                              sx={{ ml: 1 }}
                             >
                               <CopyIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                        </Typography>
+                        </Box>
                       )}
-
-                      <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {server.transport && (
-                          <Chip
-                            label={server.transport}
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                        )}
-                        {server.status && (
-                          <Chip
-                            label={server.status}
-                            size="small"
-                            color={server.status === 'Running' ? 'success' : 'error'}
-                            variant="filled"
-                          />
-                        )}
-                        {server.tags && server.tags.length > 0 && server.tags
-                          .filter(tag => tag.toLowerCase() !== 'deployed')
-                          .map((tag) => (
-                            <Chip key={tag} label={tag} size="small" color="primary" />
-                          ))}
-                      </Box>
 
                       <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
                         {server.repository && (
@@ -654,18 +742,20 @@ const RegistryDetailPage: React.FC = () => {
                   />
                 )}
               </DialogTitle>
-              <DialogContent>
-                <Box sx={{ mb: 2 }}>
+              <DialogContent sx={{ p: 0 }}>
+                {/* Description and Badges Section - Above Tabs */}
+                <Box sx={{ p: 3, pb: 2 }}>
                   {selectedServer.description && (
-                    <Typography variant="body1" sx={{ mb: 3 }}>
+                    <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
                       {selectedServer.description}
                     </Typography>
                   )}
 
-                  <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {/* Status and Transport Chips */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                     {selectedServer.transport && (
                       <Chip
-                        label={`Transport: ${selectedServer.transport}`}
+                        label={selectedServer.transport}
                         size="small"
                         color="secondary"
                         variant="outlined"
@@ -689,138 +779,143 @@ const RegistryDetailPage: React.FC = () => {
                     )}
                   </Box>
 
-                  {selectedServer.env_vars && selectedServer.env_vars.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom color="primary.main">
-                        Environment Variables ({selectedServer.env_vars.length})
-                      </Typography>
-                      <List dense sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                        {selectedServer.env_vars.map((envVar, index) => (
-                          <ListItem key={index} sx={{ py: 1, flexDirection: 'column', alignItems: 'flex-start', bgcolor: 'white', borderRadius: 1, mb: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 0.5 }}>
-                              <ListItemText
-                                primary={envVar.name}
-                                sx={{
-                                  '& .MuiListItemText-primary': {
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 'bold',
-                                    color: 'primary.main'
-                                  }
-                                }}
-                              />
-                              {envVar.required && (
-                                <Chip label="Required" size="small" color="error" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                              {envVar.secret && (
-                                <Chip label="Secret" size="small" color="warning" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', lineHeight: 1.4 }}>
-                              {envVar.description}
-                            </Typography>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Box>
-                  )}
-
-                  {selectedServer.env_vars && selectedServer.env_vars.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom color="primary.main">
-                        Environment Variables ({selectedServer.env_vars.length})
-                      </Typography>
-                      <List dense sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                        {selectedServer.env_vars.map((envVar, index) => (
-                          <ListItem key={index} sx={{ py: 1, flexDirection: 'column', alignItems: 'flex-start', bgcolor: 'white', borderRadius: 1, mb: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 0.5 }}>
-                              <ListItemText
-                                primary={envVar.name}
-                                sx={{
-                                  '& .MuiListItemText-primary': {
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 'bold',
-                                    color: 'primary.main'
-                                  }
-                                }}
-                              />
-                              {envVar.required && (
-                                <Chip label="Required" size="small" color="error" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                              {envVar.secret && (
-                                <Chip label="Secret" size="small" color="warning" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', lineHeight: 1.4 }}>
-                              {envVar.description}
-                            </Typography>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Box>
-                  )}
-
-                  {selectedServer.tools && selectedServer.tools.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Available Tools ({selectedServer.tools.length})
-                      </Typography>
-                      <Box sx={{ maxHeight: 120, overflow: 'auto', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                        <List dense>
-                          {selectedServer.tools.map((tool, index) => (
-                            <ListItem key={index} sx={{ py: 0.25, px: 1 }}>
-                              <ListItemText
-                                primary={tool}
-                                sx={{
-                                  '& .MuiListItemText-primary': {
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.8rem'
-                                  }
-                                }}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    </Box>
-                  )}
-
+                  {/* Statistics Section */}
                   {selectedServer.metadata && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>Statistics</Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {selectedServer.metadata.stars !== undefined && (
-                          <Chip
-                            label={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        )}
-                        {selectedServer.metadata.pulls !== undefined && (
-                          <Chip
-                            label={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                        )}
-                        {selectedServer.metadata.last_updated && (
-                          <Chip
-                            label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {selectedServer.metadata.stars !== undefined && (
+                        <Chip
+                          label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      )}
+                      {selectedServer.metadata.pulls !== undefined && (
+                        <Chip
+                          label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                        />
+                      )}
+                      {selectedServer.metadata.last_updated && (
+                        <Chip
+                          label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                        />
+                      )}
                     </Box>
                   )}
+                </Box>
 
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs
+                    value={dialogTabValue}
+                    onChange={handleDialogTabChange}
+                    aria-label="server details tabs"
+                  >
+                    <Tab label="Overview" {...a11yProps(0)} />
+                    <Tab label={`Tools${selectedServer.tools ? ` (${selectedServer.tools.length})` : selectedServer.tools_count ? ` (${selectedServer.tools_count})` : ''}`} {...a11yProps(1)} />
+                    <Tab label="Config" {...a11yProps(2)} />
+                    <Tab label="Manual Installation" {...a11yProps(3)} />
+                  </Tabs>
+                </Box>
+
+                <TabPanel value={dialogTabValue} index={0}>
+                  {/* Overview Tab */}
+
+                  {/* Technical Details Section */}
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                    📋 Technical Details
+                  </Typography>
+
+                  <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 2, fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                        Image:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                        {selectedServer.image}{selectedServer.version && `:${selectedServer.version}`}
+                      </Typography>
+                      <Tooltip title="Copy Image">
+                        <IconButton
+                          size="small"
+                          onClick={() => copyToClipboard(`${selectedServer.image}${selectedServer.version ? `:${selectedServer.version}` : ''}`)}
+                        >
+                          <CopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+
+                    {selectedServer.endpoint_url && (
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                          Endpoint:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                          {selectedServer.endpoint_url}
+                        </Typography>
+                        <Tooltip title="Copy Endpoint">
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(selectedServer.endpoint_url!)}
+                          >
+                            <CopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
+
+                    {selectedServer.author && (
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                          Author:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedServer.author}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {selectedServer.namespace && (
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                          Namespace:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {selectedServer.namespace}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {(selectedServer.repository_url || selectedServer.repository) && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                          Repository:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                          {selectedServer.repository_url || selectedServer.repository}
+                        </Typography>
+                        <Tooltip title="Open Repository">
+                          <IconButton
+                            size="small"
+                            onClick={() => window.open(selectedServer.repository_url || selectedServer.repository!, '_blank')}
+                          >
+                            <LaunchIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Tags Section */}
                   {selectedServer.tags && selectedServer.tags.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>Tags</Typography>
+                    <>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                        🏷️ Tags
+                      </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {selectedServer.tags
                           .filter(tag => tag.toLowerCase() !== 'deployed')
@@ -828,94 +923,140 @@ const RegistryDetailPage: React.FC = () => {
                             <Chip key={tag} label={tag} size="small" />
                           ))}
                       </Box>
-                    </Box>
+                    </>
+                  )}
+                </TabPanel>
+
+                <TabPanel value={dialogTabValue} index={1}>
+                  {/* Tools Tab */}
+                  {selectedServer.tools && selectedServer.tools.length > 0 ? (
+                    <>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        🔧 Available Tools
+                        <Chip
+                          label={`${selectedServer.tools.length} tools`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Typography>
+                      <Box sx={{ maxHeight: 400, overflow: 'auto', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                        <List dense>
+                          {selectedServer.tools.map((tool, index) => (
+                            <ListItem key={index} sx={{ py: 0.5, px: 1, bgcolor: 'white', borderRadius: 1, mb: 0.5 }}>
+                              <ListItemText
+                                primary={tool}
+                                sx={{
+                                  '& .MuiListItemText-primary': {
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 'medium'
+                                  }
+                                }}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No tools information available for this server.
+                    </Typography>
                   )}
 
+                  {/* MCP Capabilities */}
                   {selectedServer.capabilities && selectedServer.capabilities.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>Capabilities</Typography>
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        ⚡ MCP Capabilities
+                      </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {selectedServer.capabilities.map((capability) => (
-                          <Chip key={capability} label={capability} size="small" color="info" />
+                          <Chip key={capability} label={capability} size="small" color="info" variant="outlined" />
                         ))}
                       </Box>
                     </Box>
                   )}
+                </TabPanel>
 
-                  <Divider sx={{ my: 2 }} />
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, display: 'flex', alignItems: 'center' }}>
-                      <strong>Image:</strong> {selectedServer.image}
-                      {selectedServer.version && `:${selectedServer.version}`}
-                      <Tooltip title="Copy Image">
-                        <IconButton
+                <TabPanel value={dialogTabValue} index={2}>
+                  {/* Config Tab */}
+                  {selectedServer.env_vars && selectedServer.env_vars.length > 0 ? (
+                    <>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        ⚙️ Configuration
+                        <Chip
+                          label={`${selectedServer.env_vars.length} variables`}
                           size="small"
-                          onClick={() => copyToClipboard(selectedServer.image)}
-                          sx={{ ml: 1 }}
-                        >
-                          <CopyIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                          variant="outlined"
+                        />
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Environment variables required for this server
+                      </Typography>
+
+                      <List dense sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                        {selectedServer.env_vars.map((envVar, index) => (
+                          <ListItem key={index} sx={{ py: 1, flexDirection: 'column', alignItems: 'flex-start', bgcolor: 'white', borderRadius: 1, mb: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 0.5 }}>
+                              <ListItemText
+                                primary={envVar.name}
+                                sx={{
+                                  '& .MuiListItemText-primary': {
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.95rem',
+                                    fontWeight: 'bold',
+                                    color: 'primary.main'
+                                  }
+                                }}
+                              />
+                              {envVar.required && (
+                                <Chip label="Required" size="small" color="error" variant="filled" sx={{ ml: 1 }} />
+                              )}
+                              {envVar.secret && (
+                                <Chip label="Secret" size="small" color="warning" variant="filled" sx={{ ml: 1 }} />
+                              )}
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', lineHeight: 1.4 }}>
+                              {envVar.description}
+                            </Typography>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No configuration options available for this server.
                     </Typography>
+                  )}
+                </TabPanel>
 
-                    {selectedServer.endpoint_url && (
-                      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, display: 'flex', alignItems: 'center' }}>
-                        <strong>Endpoint:</strong> {selectedServer.endpoint_url}
-                        <Tooltip title="Copy Endpoint">
-                          <IconButton
-                            size="small"
-                            onClick={() => copyToClipboard(selectedServer.endpoint_url!)}
-                            sx={{ ml: 1 }}
-                          >
-                            <CopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Typography>
-                    )}
-
-                    {selectedServer.author && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        <strong>Author:</strong> {selectedServer.author}
-                      </Typography>
-                    )}
-                    {selectedServer.namespace && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        <strong>Namespace:</strong> {selectedServer.namespace}
-                      </Typography>
-                    )}
-                    {(selectedServer.repository_url || selectedServer.repository) && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                        <strong>Repository:</strong>
-                        <Typography
-                          component="span"
-                          sx={{ ml: 1, fontFamily: 'monospace', fontSize: '0.875rem' }}
-                        >
-                          {selectedServer.repository_url || selectedServer.repository}
-                        </Typography>
-                        <Tooltip title="Open Repository">
-                          <IconButton
-                            size="small"
-                            onClick={() => window.open(selectedServer.repository_url || selectedServer.repository!, '_blank')}
-                            sx={{ ml: 1 }}
-                          >
-                            <LaunchIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Typography>
-                    )}
+                <TabPanel value={dialogTabValue} index={3}>
+                  {/* Manual Installation Tab */}
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    📖 Manual Installation
+                  </Typography>
+                  <Box sx={{
+                    bgcolor: 'grey.50',
+                    borderRadius: 1,
+                    p: 3,
+                    textAlign: 'center',
+                    minHeight: 200,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Typography variant="h5" sx={{ mb: 2, color: 'text.secondary' }}>
+                      🚧 Work In Progress
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      Manual installation instructions will be available soon.
+                    </Typography>
                   </Box>
-                </Box>
+                </TabPanel>
               </DialogContent>
               <DialogActions>
-                {(selectedServer.repository_url || selectedServer.repository) && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => window.open(selectedServer.repository_url || selectedServer.repository!, '_blank')}
-                  >
-                    Repository
-                  </Button>
-                )}
                 {selectedServer.documentation && (
                   <Button
                     variant="outlined"

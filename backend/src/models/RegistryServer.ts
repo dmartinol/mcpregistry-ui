@@ -42,6 +42,9 @@ export interface RegistryServer {
   /** List of available tools */
   tools?: string[];
 
+  /** Number of available tools (available in list API) */
+  tools_count?: number;
+
   /** Server status (Active, Running, etc.) */
   status?: string;
 
@@ -145,6 +148,7 @@ export const registryServerSchema = Joi.object<RegistryServer>({
   tier: Joi.string().optional(),
   transport: Joi.string().optional(),
   tools: Joi.array().items(Joi.string()).optional(),
+  tools_count: Joi.number().integer().min(0).optional(),
   status: Joi.string().optional(),
   endpoint_url: Joi.string().uri().optional(),
   ready: Joi.boolean().optional(),

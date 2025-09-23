@@ -41,7 +41,7 @@ export class RegistryService {
     const createdRegistry = await this.k8sClient.createMCPRegistry(mcpRegistry);
 
     // Convert to our Registry model
-    return this.k8sClient.mcpRegistryToRegistry(createdRegistry);
+    return await this.k8sClient.mcpRegistryToRegistry(createdRegistry);
   }
 
   async getRegistries(
@@ -53,9 +53,9 @@ export class RegistryService {
     const mcpRegistries = await this.k8sClient.getMCPRegistries();
 
     // Convert to our Registry model
-    let registries = mcpRegistries.map(mcpRegistry =>
+    let registries = await Promise.all(mcpRegistries.map(mcpRegistry =>
       this.k8sClient.mcpRegistryToRegistry(mcpRegistry)
-    );
+    ));
 
     // Filter by status if provided
     if (status) {
@@ -82,7 +82,7 @@ export class RegistryService {
     }
 
     // Convert to our RegistryDetails model
-    return this.k8sClient.mcpRegistryToRegistryDetails(mcpRegistry);
+    return await this.k8sClient.mcpRegistryToRegistryDetails(mcpRegistry);
   }
 
   async updateRegistry(id: string, data: UpdateRegistryRequest): Promise<Registry | null> {
@@ -117,7 +117,7 @@ export class RegistryService {
     const updatedRegistry = await this.k8sClient.updateMCPRegistry(id, updateData);
 
     // Convert to our Registry model
-    return this.k8sClient.mcpRegistryToRegistry(updatedRegistry);
+    return await this.k8sClient.mcpRegistryToRegistry(updatedRegistry);
   }
 
   async deleteRegistry(id: string): Promise<boolean> {
