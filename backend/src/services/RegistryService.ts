@@ -159,6 +159,28 @@ export class RegistryService {
     };
   }
 
+  async forceSyncRegistry(id: string): Promise<{ syncId: string; status: string } | null> {
+    // Check if registry exists
+    const registry = await this.k8sClient.getMCPRegistry(id);
+    if (!registry) {
+      return null;
+    }
+
+    // Trigger force sync by adding the specific annotation
+    await this.k8sClient.addForceSyncAnnotation(id);
+
+    return {
+      syncId: `force-sync-${Date.now()}`,
+      status: 'initiated',
+    };
+  }
+
+  async refreshRegistries(): Promise<void> {
+    // This method will be used to refresh the registry cache
+    // For now, it's just a placeholder since we're fetching from Kubernetes directly
+    console.log('Refreshing registries data from Kubernetes cluster');
+  }
+
 
   // Get current namespace
   getCurrentNamespace(): string {

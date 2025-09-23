@@ -15,6 +15,12 @@ export interface Registry {
     type: 'none' | 'basic' | 'bearer' | 'oauth';
     [key: string]: any;
   };
+  // Source information
+  source?: {
+    type: 'configmap' | 'git' | 'http' | 'https';
+    location: string;
+    syncInterval?: string;
+  };
 }
 
 export interface CreateRegistryRequest {

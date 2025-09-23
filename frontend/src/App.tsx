@@ -29,7 +29,16 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import { Home as HomeIcon, ContentCopy as CopyIcon, Launch as LaunchIcon } from '@mui/icons-material';
+import {
+  Home as HomeIcon,
+  ContentCopy as CopyIcon,
+  Launch as LaunchIcon,
+  Refresh as RefreshIcon,
+  Sync as SyncIcon,
+  Storage as StorageIcon,
+  Http as HttpIcon,
+  GitHub as GitIcon
+} from '@mui/icons-material';
 
 interface Registry {
   id: string;
@@ -40,6 +49,11 @@ interface Registry {
   description?: string;
   createdAt: string;
   updatedAt: string;
+  source?: {
+    type: 'configmap' | 'git' | 'http' | 'https';
+    location: string;
+    syncInterval?: string;
+  };
 }
 
 interface ApiResponse {
@@ -122,6 +136,7 @@ const RegistryDashboard: React.FC = () => {
   const [registries, setRegistries] = useState<Registry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -171,6 +186,74 @@ const RegistryDashboard: React.FC = () => {
     navigate(`/registries/${registryId}`);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetch('/api/v1/registries/refresh', { method: 'POST' });
+      const response = await fetch('/api/v1/registries');
+      if (response.ok) {
+        const data: ApiResponse = await response.json();
+        setRegistries(data.registries);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error refreshing registries:', err);
+      setError('Failed to refresh registries');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleForceSync = async (registryId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      const response = await fetch(`/api/v1/registries/${registryId}/force-sync`, { method: 'POST' });
+      if (response.ok) {
+        console.log('Force sync initiated for registry:', registryId);
+        // Optionally refresh the data to show updated status
+        await handleRefresh();
+      } else {
+        const error = await response.json();
+        console.error('Force sync failed:', error);
+      }
+    } catch (err) {
+      console.error('Error triggering force sync:', err);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const getSourceIcon = (type: string) => {
+    switch (type) {
+      case 'git':
+        return <GitIcon fontSize="small" />;
+      case 'configmap':
+        return <StorageIcon fontSize="small" />;
+      case 'http':
+      case 'https':
+        return <HttpIcon fontSize="small" />;
+      default:
+        return <StorageIcon fontSize="small" />;
+    }
+  };
+
+  const getSourceColor = (type: string): 'primary' | 'secondary' | 'success' | 'warning' => {
+    switch (type) {
+      case 'git':
+        return 'primary';
+      case 'configmap':
+        return 'secondary';
+      case 'http':
+        return 'warning';
+      case 'https':
+        return 'success';
+      default:
+        return 'secondary';
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -201,9 +284,20 @@ const RegistryDashboard: React.FC = () => {
 
         {!loading && !error && (
           <Box>
-            <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-              Found {registries.length} registries
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Found {registries.length} registries
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleRefresh}
+                disabled={refreshing}
+                sx={{ minWidth: 120 }}
+              >
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
 
             <Grid container spacing={3}>
               {registries.map((registry) => (
@@ -225,17 +319,65 @@ const RegistryDashboard: React.FC = () => {
                         <Typography variant="h6" component="h2">
                           {registry.name}
                         </Typography>
-                        <Chip
-                          label={registry.status}
-                          color={getStatusColor(registry.status)}
-                          size="small"
-                        />
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                          {registry.source && (
+                            <Chip
+                              icon={getSourceIcon(registry.source.type)}
+                              label={registry.source.type}
+                              color={getSourceColor(registry.source.type)}
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
+                          <Chip
+                            label={registry.status}
+                            color={getStatusColor(registry.status)}
+                            size="small"
+                          />
+                        </Box>
                       </Box>
 
                       {registry.description && (
                         <Typography variant="body2" color="text.secondary" paragraph>
                           {registry.description}
                         </Typography>
+                      )}
+
+                      {registry.source && (
+                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
+                            Source:
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {registry.source.location}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {registry.source?.syncInterval && (
+                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
+                            Sync:
+                          </Typography>
+                          <Chip
+                            icon={<SyncIcon fontSize="small" />}
+                            label={registry.source.syncInterval}
+                            size="small"
+                            color={registry.source.syncInterval === 'manual' ? 'default' : 'info'}
+                            variant="outlined"
+                          />
+                        </Box>
                       )}
 
                       <Typography variant="body2" color="text.secondary">
@@ -282,6 +424,18 @@ const RegistryDashboard: React.FC = () => {
                       <Typography variant="caption" display="block">
                         Updated: {formatDate(registry.updatedAt)}
                       </Typography>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<SyncIcon />}
+                          onClick={(e) => handleForceSync(registry.id, e)}
+                          sx={{ minWidth: 120 }}
+                        >
+                          Force Sync
+                        </Button>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -918,7 +1072,7 @@ const RegistryDetailPage: React.FC = () => {
                       </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {selectedServer.tags
-                          .filter(tag => tag.toLowerCase() !== 'deployed')
+                          .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
                           .map((tag) => (
                             <Chip key={tag} label={tag} size="small" />
                           ))}

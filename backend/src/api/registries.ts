@@ -271,4 +271,35 @@ router.get('/:registryId/servers/deployed/:serverName', async (req: Request, res
   }
 });
 
+// POST /api/v1/registries/:registryId/force-sync
+router.post('/:registryId/force-sync', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await registryService.forceSyncRegistry(req.params.registryId);
+    if (!result) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error triggering force sync:', error);
+    if (error instanceof Error && error.message.includes('already in progress')) {
+      res.status(409).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+// POST /api/v1/registries/refresh
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    await registryService.refreshRegistries();
+    res.json({ status: 'success', message: 'Registries refreshed' });
+  } catch (error) {
+    console.error('Error refreshing registries:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export { router as registriesRouter };

@@ -18,6 +18,27 @@ export interface MCPRegistry {
       type: string;
       [key: string]: any;
     };
+    // Source configuration
+    source?: {
+      type?: 'configmap' | 'git' | 'http' | 'https';
+      configMap?: {
+        name: string;
+        key?: string;
+      };
+      git?: {
+        repository: string;
+        branch?: string;
+        path?: string;
+      };
+      http?: {
+        url: string;
+      };
+    };
+    // Sync configuration
+    sync?: {
+      interval?: string;
+      automatic?: boolean;
+    };
     [key: string]: any;
   };
   status?: {
@@ -282,6 +303,7 @@ export class KubernetesClient {
   async mcpRegistryToRegistry(mcpRegistry: MCPRegistry): Promise<Registry> {
     const status = this.mapMCPPhaseToStatus(mcpRegistry.status?.phase);
     const actualServerCount = await this.getActualServerCount(mcpRegistry);
+    const sourceInfo = this.extractSourceInfo(mcpRegistry);
 
     return {
       id: mcpRegistry.metadata.name,
@@ -299,6 +321,7 @@ export class KubernetesClient {
         phase: mcpRegistry.status?.phase,
       },
       authConfig: mcpRegistry.spec.auth || { type: 'none' },
+      source: sourceInfo,
     };
   }
 
@@ -430,6 +453,92 @@ export class KubernetesClient {
     } catch (error) {
       console.error('Error making Kubernetes proxy request:', error);
       throw new Error(`Failed to proxy request to service ${serviceName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Extract source information from MCPRegistry spec
+   */
+  private extractSourceInfo(mcpRegistry: MCPRegistry): Registry['source'] | undefined {
+    const spec = mcpRegistry.spec;
+
+    // If there's no source configuration, try to infer from URL
+    if (!spec.source) {
+      const url = spec.url;
+      if (url) {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          return {
+            type: url.startsWith('https://') ? 'https' : 'http',
+            location: url,
+            syncInterval: spec.sync?.interval || 'manual'
+          };
+        }
+      }
+      return undefined;
+    }
+
+    const source = spec.source;
+    let location = '';
+    let type = source.type || 'http';
+
+    // Determine location string based on source type
+    if (source.configMap) {
+      type = 'configmap';
+      location = `${source.configMap.name}${source.configMap.key ? `:${source.configMap.key}` : ''}`;
+    } else if (source.git) {
+      type = 'git';
+      const branch = source.git.branch || 'main';
+      const path = source.git.path ? `/${source.git.path}` : '';
+      location = `${source.git.repository}@${branch}${path}`;
+    } else if (source.http) {
+      type = source.http.url.startsWith('https://') ? 'https' : 'http';
+      location = source.http.url;
+    }
+
+    return {
+      type,
+      location,
+      syncInterval: spec.sync?.interval || (spec.sync?.automatic === false ? 'manual' : 'manual')
+    };
+  }
+
+  /**
+   * Add force sync annotation to trigger manual sync
+   */
+  async addForceSyncAnnotation(name: string): Promise<void> {
+    if (!this.customApi) {
+      throw new Error('Kubernetes client not available');
+    }
+
+    try {
+      const timestamp = new Date().toISOString();
+      const patch = {
+        metadata: {
+          annotations: {
+            'toolhive.stacklok.dev/sync-trigger': timestamp,
+          },
+        },
+      };
+
+      await this.customApi.patchNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        this.namespace,
+        'mcpregistries',
+        name,
+        patch,
+        undefined,
+        undefined,
+        undefined,
+        {
+          headers: {
+            'Content-Type': 'application/merge-patch+json',
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Error adding force sync annotation:', error);
+      throw new Error(`Failed to trigger force sync for MCPRegistry ${name}`);
     }
   }
 }
