@@ -27,7 +27,9 @@ import {
   ListItemText,
   Divider,
   Tooltip,
-  IconButton
+  IconButton,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -37,7 +39,9 @@ import {
   Sync as SyncIcon,
   Storage as StorageIcon,
   Http as HttpIcon,
-  GitHub as GitIcon
+  GitHub as GitIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 
 interface Registry {
@@ -467,8 +471,13 @@ const RegistryDetailPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogTabValue, setDialogTabValue] = useState(0);
   const [serverDetailsLoading, setServerDetailsLoading] = useState(false);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [transportFilters, setTransportFilters] = useState<string[]>([]);
+  const [tierFilters, setTierFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -520,12 +529,66 @@ const RegistryDetailPage: React.FC = () => {
     setTabValue(newValue);
   };
 
-  const handleDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setDialogTabValue(newValue);
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  // Filter and search logic
+  const filterServers = (serverList: Server[]) => {
+    return serverList.filter(server => {
+      // Search filter
+      const matchesSearch = !searchQuery ||
+        server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        server.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        server.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      // Transport filter (multiple selection - OR logic)
+      const matchesTransport = transportFilters.length === 0 || transportFilters.includes(server.transport || '');
+
+      // Tier filter (multiple selection - OR logic)
+      const matchesTier = tierFilters.length === 0 || tierFilters.includes(server.tier || '');
+
+      // Status filter (multiple selection - OR logic, only for deployed servers)
+      const matchesStatus = statusFilters.length === 0 || statusFilters.includes(server.status || '');
+
+      return matchesSearch && matchesTransport && matchesTier && matchesStatus;
+    });
+  };
+
+  const filteredServers = filterServers(servers);
+  const filteredDeployedServers = filterServers(deployedServers);
+
+  // Get unique values for filter badges
+  const getAllTransports = () => {
+    const transports = new Set<string>();
+    [...servers, ...deployedServers].forEach(server => {
+      if (server.transport) transports.add(server.transport);
+    });
+    return Array.from(transports);
+  };
+
+  const getAllTiers = () => {
+    const tiers = new Set<string>();
+    [...servers, ...deployedServers].forEach(server => {
+      if (server.tier) tiers.add(server.tier);
+    });
+    return Array.from(tiers);
+  };
+
+  const getAllStatuses = () => {
+    const statuses = new Set<string>();
+    deployedServers.forEach(server => {
+      if (server.status) statuses.add(server.status);
+    });
+    return Array.from(statuses);
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setTransportFilters([]);
+    setTierFilters([]);
+    setStatusFilters([]);
   };
 
   const handleServerClick = async (server: Server, isDeployed: boolean = false) => {
@@ -558,7 +621,6 @@ const RegistryDetailPage: React.FC = () => {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedServer(null);
-    setDialogTabValue(0);
   };
 
   if (loading) {
@@ -592,37 +654,164 @@ const RegistryDetailPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 2, mb: 4 }}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link
-            color="inherit"
-            href="/"
-            onClick={(e) => { e.preventDefault(); navigate('/'); }}
-            sx={{ display: 'flex', alignItems: 'center' }}
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Registries
-          </Link>
-          <Typography color="text.primary">{registry.name}</Typography>
-        </Breadcrumbs>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* Fixed Header Section */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1100,
+          bgcolor: 'background.default',
+          borderBottom: 1,
+          borderColor: 'divider',
+          pb: 2
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ pt: 2 }}>
+            <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+              <Link
+                color="inherit"
+                href="/"
+                onClick={(e) => { e.preventDefault(); navigate('/'); }}
+                sx={{ display: 'flex', alignItems: 'center' }}
+              >
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                Registries
+              </Link>
+              <Typography color="text.primary">{registry.name}</Typography>
+            </Breadcrumbs>
 
-        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            {registry.name}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Typography variant="body2">
-              <strong>URL:</strong> {registry.url || 'Not specified'}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Status:</strong> {registry.status}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Server Count:</strong> {registry.serverCount}
-            </Typography>
+            <Paper elevation={2} sx={{ p: 3 }}>
+              <Typography variant="h4" component="h1" gutterBottom>
+                {registry.name}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2">
+                  <strong>URL:</strong> {registry.url || 'Not specified'}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Status:</strong> {registry.status}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Server Count:</strong> {registry.serverCount}
+                </Typography>
+              </Box>
+            </Paper>
           </Box>
-        </Paper>
+        </Container>
+      </Box>
+
+      {/* Scrollable Content Section */}
+      <Container maxWidth="lg" sx={{ flex: 1, pt: 3 }}>
+
+        {/* Search and Filter Section */}
+        <Box sx={{ mb: 3 }}>
+          {/* Search Bar */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search servers by name, description, or tags..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setSearchQuery('')}
+                    edge="end"
+                    size="small"
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Filter Badges */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ mr: 1, fontWeight: 'bold' }}>
+              Filters:
+            </Typography>
+
+            {/* Transport Filter */}
+            {getAllTransports().map((transport) => (
+              <Chip
+                key={transport}
+                label={transport}
+                clickable
+                variant={transportFilters.includes(transport) ? 'filled' : 'outlined'}
+                color={transportFilters.includes(transport) ? 'primary' : 'default'}
+                onClick={() => {
+                  if (transportFilters.includes(transport)) {
+                    setTransportFilters(transportFilters.filter(t => t !== transport));
+                  } else {
+                    setTransportFilters([...transportFilters, transport]);
+                  }
+                }}
+                size="small"
+              />
+            ))}
+
+            {/* Tier Filter - hide for deployed servers tab */}
+            {tabValue !== 1 && getAllTiers().map((tier) => (
+              <Chip
+                key={tier}
+                label={tier}
+                clickable
+                variant={tierFilters.includes(tier) ? 'filled' : 'outlined'}
+                color={tierFilters.includes(tier) ? 'secondary' : 'default'}
+                onClick={() => {
+                  if (tierFilters.includes(tier)) {
+                    setTierFilters(tierFilters.filter(t => t !== tier));
+                  } else {
+                    setTierFilters([...tierFilters, tier]);
+                  }
+                }}
+                size="small"
+              />
+            ))}
+
+            {/* Status Filter (only show for deployed servers tab) */}
+            {tabValue === 1 && getAllStatuses().map((status) => (
+              <Chip
+                key={status}
+                label={status}
+                clickable
+                variant={statusFilters.includes(status) ? 'filled' : 'outlined'}
+                color={statusFilters.includes(status) ? (status === 'Running' ? 'success' : 'error') : 'default'}
+                onClick={() => {
+                  if (statusFilters.includes(status)) {
+                    setStatusFilters(statusFilters.filter(s => s !== status));
+                  } else {
+                    setStatusFilters([...statusFilters, status]);
+                  }
+                }}
+                size="small"
+              />
+            ))}
+
+            {/* Clear Filters Button */}
+            {(searchQuery || transportFilters.length > 0 || tierFilters.length > 0 || statusFilters.length > 0) && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={clearFilters}
+                startIcon={<ClearIcon />}
+                sx={{ ml: 1 }}
+              >
+                Clear All
+              </Button>
+            )}
+          </Box>
+        </Box>
 
         <Paper elevation={1}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -641,11 +830,11 @@ const RegistryDetailPage: React.FC = () => {
               <Box display="flex" justifyContent="center">
                 <CircularProgress />
               </Box>
-            ) : servers.length === 0 ? (
+            ) : filteredServers.length === 0 ? (
               <Alert severity="info">No servers available in this registry</Alert>
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-                {servers.map((server) => (
+                {filteredServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
@@ -723,11 +912,11 @@ const RegistryDetailPage: React.FC = () => {
               <Box display="flex" justifyContent="center">
                 <CircularProgress />
               </Box>
-            ) : deployedServers.length === 0 ? (
+            ) : filteredDeployedServers.length === 0 ? (
               <Alert severity="info">No deployed servers for this registry</Alert>
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-                {deployedServers.map((server) => (
+                {filteredDeployedServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
@@ -964,21 +1153,10 @@ const RegistryDetailPage: React.FC = () => {
                   )}
                 </Box>
 
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                  <Tabs
-                    value={dialogTabValue}
-                    onChange={handleDialogTabChange}
-                    aria-label="server details tabs"
-                  >
-                    <Tab label="Overview" {...a11yProps(0)} />
-                    <Tab label={`Tools${selectedServer.tools ? ` (${selectedServer.tools.length})` : selectedServer.tools_count ? ` (${selectedServer.tools_count})` : ''}`} {...a11yProps(1)} />
-                    <Tab label="Config" {...a11yProps(2)} />
-                    <Tab label="Manual Installation" {...a11yProps(3)} />
-                  </Tabs>
-                </Box>
+                {/* Overview content only - tabs removed per user request */}
 
-                <TabPanel value={dialogTabValue} index={0}>
-                  {/* Overview Tab */}
+                <Box sx={{ p: 3 }}>
+                  {/* Overview Content */}
 
                   {/* Technical Details Section */}
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
@@ -1079,136 +1257,8 @@ const RegistryDetailPage: React.FC = () => {
                       </Box>
                     </>
                   )}
-                </TabPanel>
+                </Box>
 
-                <TabPanel value={dialogTabValue} index={1}>
-                  {/* Tools Tab */}
-                  {selectedServer.tools && selectedServer.tools.length > 0 ? (
-                    <>
-                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        🔧 Available Tools
-                        <Chip
-                          label={`${selectedServer.tools.length} tools`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Typography>
-                      <Box sx={{ maxHeight: 400, overflow: 'auto', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                        <List dense>
-                          {selectedServer.tools.map((tool, index) => (
-                            <ListItem key={index} sx={{ py: 0.5, px: 1, bgcolor: 'white', borderRadius: 1, mb: 0.5 }}>
-                              <ListItemText
-                                primary={tool}
-                                sx={{
-                                  '& .MuiListItemText-primary': {
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 'medium'
-                                  }
-                                }}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    </>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No tools information available for this server.
-                    </Typography>
-                  )}
-
-                  {/* MCP Capabilities */}
-                  {selectedServer.capabilities && selectedServer.capabilities.length > 0 && (
-                    <Box sx={{ mt: 3 }}>
-                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        ⚡ MCP Capabilities
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {selectedServer.capabilities.map((capability) => (
-                          <Chip key={capability} label={capability} size="small" color="info" variant="outlined" />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                </TabPanel>
-
-                <TabPanel value={dialogTabValue} index={2}>
-                  {/* Config Tab */}
-                  {selectedServer.env_vars && selectedServer.env_vars.length > 0 ? (
-                    <>
-                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        ⚙️ Configuration
-                        <Chip
-                          label={`${selectedServer.env_vars.length} variables`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Environment variables required for this server
-                      </Typography>
-
-                      <List dense sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                        {selectedServer.env_vars.map((envVar, index) => (
-                          <ListItem key={index} sx={{ py: 1, flexDirection: 'column', alignItems: 'flex-start', bgcolor: 'white', borderRadius: 1, mb: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 0.5 }}>
-                              <ListItemText
-                                primary={envVar.name}
-                                sx={{
-                                  '& .MuiListItemText-primary': {
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 'bold',
-                                    color: 'primary.main'
-                                  }
-                                }}
-                              />
-                              {envVar.required && (
-                                <Chip label="Required" size="small" color="error" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                              {envVar.secret && (
-                                <Chip label="Secret" size="small" color="warning" variant="filled" sx={{ ml: 1 }} />
-                              )}
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', lineHeight: 1.4 }}>
-                              {envVar.description}
-                            </Typography>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No configuration options available for this server.
-                    </Typography>
-                  )}
-                </TabPanel>
-
-                <TabPanel value={dialogTabValue} index={3}>
-                  {/* Manual Installation Tab */}
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    📖 Manual Installation
-                  </Typography>
-                  <Box sx={{
-                    bgcolor: 'grey.50',
-                    borderRadius: 1,
-                    p: 3,
-                    textAlign: 'center',
-                    minHeight: 200,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    <Typography variant="h5" sx={{ mb: 2, color: 'text.secondary' }}>
-                      🚧 Work In Progress
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      Manual installation instructions will be available soon.
-                    </Typography>
-                  </Box>
-                </TabPanel>
               </DialogContent>
               <DialogActions>
                 {selectedServer.documentation && (
@@ -1233,8 +1283,8 @@ const RegistryDetailPage: React.FC = () => {
             </>
           )}
         </Dialog>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 
