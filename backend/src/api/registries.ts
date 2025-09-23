@@ -28,8 +28,14 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { status, limit, offset } = value;
-    const result = await registryService.getRegistries(status, limit, offset);
+    const { status, limit, offset, namespace } = value;
+
+    // Create a new registry service with the specified namespace if provided
+    const serviceToUse = namespace
+      ? new RegistryService(namespace)
+      : registryService;
+
+    const result = await serviceToUse.getRegistries(status, limit, offset);
 
     res.json(result);
   } catch (error) {

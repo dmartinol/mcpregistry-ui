@@ -167,6 +167,10 @@ export const RegistryDetailPage: React.FC = () => {
     try {
       await api.deployServer(registryId, selectedServer.name, config);
 
+      // Close the deployment dialog after successful deployment
+      setDeployDialogOpen(false);
+      setSelectedServer(null);
+
       // Refresh deployed servers list
       setDeployedLoading(true);
       try {

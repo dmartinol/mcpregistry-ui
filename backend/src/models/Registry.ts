@@ -109,6 +109,8 @@ export const registryQuerySchema = Joi.object({
     .integer()
     .min(0)
     .default(0),
+  namespace: Joi.string()
+    .optional(),
 });
 
 // Utility functions

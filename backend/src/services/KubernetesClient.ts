@@ -21,7 +21,7 @@ export interface MCPRegistry {
     // Source configuration
     source?: {
       type?: 'configmap' | 'git' | 'http' | 'https';
-      configMap?: {
+      configmap?: {
         name: string;
         key?: string;
       };
@@ -35,9 +35,8 @@ export interface MCPRegistry {
       };
     };
     // Sync configuration
-    sync?: {
+    syncPolicy?: {
       interval?: string;
-      automatic?: boolean;
     };
     [key: string]: any;
   };
@@ -91,8 +90,22 @@ export interface MCPServer {
   status?: {
     phase: 'Pending' | 'Running' | 'Failed' | 'Terminating';
     ready: boolean;
+    url?: string;
     [key: string]: any;
   };
+}
+
+export interface OrphanedServer {
+  name: string;
+  namespace: string;
+  transport: 'streamable-http' | 'stdio';
+  port: number;
+  targetPort: number;
+  url?: string;
+  image: string;
+  status: 'Pending' | 'Running' | 'Failed' | 'Terminating';
+  createdAt: string;
+  labels?: Record<string, string>;
 }
 
 export class KubernetesClient {
@@ -492,7 +505,7 @@ export class KubernetesClient {
           return {
             type: url.startsWith('https://') ? 'https' : 'http',
             location: url,
-            syncInterval: spec.sync?.interval || 'manual'
+            syncInterval: spec.syncPolicy?.interval || 'manual'
           };
         }
       }
@@ -504,9 +517,9 @@ export class KubernetesClient {
     let type = source.type || 'http';
 
     // Determine location string based on source type
-    if (source.configMap) {
+    if (source.configmap) {
       type = 'configmap';
-      location = `${source.configMap.name}${source.configMap.key ? `:${source.configMap.key}` : ''}`;
+      location = `${source.configmap.name}${source.configmap.key ? `:${source.configmap.key}` : ''}`;
     } else if (source.git) {
       type = 'git';
       const branch = source.git.branch || 'main';
@@ -520,7 +533,7 @@ export class KubernetesClient {
     return {
       type,
       location,
-      syncInterval: spec.sync?.interval || (spec.sync?.automatic === false ? 'manual' : 'manual')
+      syncInterval: spec.syncPolicy?.interval || 'manual'
     };
   }
 
@@ -697,7 +710,115 @@ export class KubernetesClient {
       );
     } catch (error) {
       console.error('Error deleting MCPServer:', error);
+      if ((error as any).statusCode === 404) {
+        throw new Error(`MCPServer ${name} not found`);
+      }
       throw new Error(`Failed to delete MCPServer ${name}`);
+    }
+  }
+
+  /**
+   * Get orphaned MCPServers (servers without registry labels)
+   */
+  async getOrphanedMCPServers(namespace?: string): Promise<OrphanedServer[]> {
+    if (!this.customApi) {
+      console.warn('Kubernetes client not available, returning empty orphaned server list');
+      return [];
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      const response = await this.customApi.listNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        targetNamespace,
+        'mcpservers'
+      );
+
+      const servers = (response.body as any).items || [];
+
+      // Filter for orphaned servers (missing required registry labels)
+      const orphanedServers = servers.filter((server: MCPServer) => {
+        const labels = server.metadata.labels || {};
+        const hasRegistryName = labels['toolhive.stacklok.io/registry-name'];
+        const hasRegistryNamespace = labels['toolhive.stacklok.io/registry-namespace'];
+        const hasServerName = labels['toolhive.stacklok.io/server-name'];
+
+        // Server is orphaned if any required label is missing
+        return !hasRegistryName || !hasRegistryNamespace || !hasServerName;
+      });
+
+      // Convert to OrphanedServer format
+      return orphanedServers.map((server: MCPServer): OrphanedServer => ({
+        name: server.metadata.name,
+        namespace: server.metadata.namespace,
+        transport: server.spec.transport,
+        port: server.spec.port,
+        targetPort: server.spec.targetPort,
+        url: server.status?.url,
+        image: server.spec.image,
+        status: server.status?.phase || 'Pending',
+        createdAt: server.metadata.creationTimestamp,
+        labels: server.metadata.labels,
+      }));
+    } catch (error) {
+      console.error('Error fetching orphaned MCPServers:', error);
+      throw new Error('Failed to fetch orphaned MCPServers from Kubernetes');
+    }
+  }
+
+  /**
+   * Connect an orphaned server to a registry by adding the required labels
+   */
+  async connectServerToRegistry(
+    serverName: string,
+    registryName: string,
+    registryNamespace: string,
+    serverNameInRegistry: string,
+    namespace?: string
+  ): Promise<MCPServer> {
+    if (!this.customApi) {
+      throw new Error('Kubernetes client not available');
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      const patch = {
+        metadata: {
+          labels: {
+            'toolhive.stacklok.io/registry-name': registryName,
+            'toolhive.stacklok.io/registry-namespace': registryNamespace,
+            'toolhive.stacklok.io/server-name': serverNameInRegistry,
+          },
+        },
+      };
+
+      const response = await this.customApi.patchNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        targetNamespace,
+        'mcpservers',
+        serverName,
+        patch,
+        undefined,
+        undefined,
+        undefined,
+        {
+          headers: {
+            'Content-Type': 'application/merge-patch+json',
+          },
+        }
+      );
+
+      return response.body as MCPServer;
+    } catch (error) {
+      console.error('Error connecting server to registry:', error);
+      if ((error as any).statusCode === 404) {
+        throw new Error(`MCPServer ${serverName} not found`);
+      }
+      throw new Error(`Failed to connect server ${serverName} to registry ${registryName}`);
     }
   }
 }

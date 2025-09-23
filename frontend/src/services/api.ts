@@ -87,6 +87,31 @@ interface DeploymentResponse {
   manifest: string;
 }
 
+interface OrphanedServer {
+  name: string;
+  namespace: string;
+  transport: 'streamable-http' | 'stdio';
+  port: number;
+  targetPort: number;
+  url?: string;
+  image: string;
+  status: 'Pending' | 'Running' | 'Failed' | 'Terminating';
+  createdAt: string;
+  labels?: Record<string, string>;
+}
+
+interface OrphanedServersResponse {
+  servers: OrphanedServer[];
+  total: number;
+  namespace: string;
+}
+
+interface ConnectToRegistryRequest {
+  registryName: string;
+  registryNamespace: string;
+  serverNameInRegistry: string;
+}
+
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -120,8 +145,25 @@ async function fetchWithErrorHandling(url: string, options?: RequestInit) {
 
 export const api = {
   // Registry management
-  async getRegistries(): Promise<Registry[]> {
-    return fetchWithErrorHandling(`${API_BASE_URL}/registries`);
+  async getRegistries(namespace?: string): Promise<Registry[]> {
+    let url = `${API_BASE_URL}/registries`;
+    if (namespace) {
+      const params = new URLSearchParams({ namespace });
+      url += `?${params.toString()}`;
+    }
+    const response = await fetchWithErrorHandling(url);
+
+    // Validate response structure
+    if (!response || typeof response !== 'object') {
+      throw new ApiError(0, 'Invalid API response format');
+    }
+
+    if (!Array.isArray(response.registries)) {
+      console.warn('API response does not contain a registries array:', response);
+      return [];
+    }
+
+    return response.registries;
   },
 
   async getRegistryDetails(registryId: string): Promise<Registry> {
@@ -183,8 +225,13 @@ export const api = {
   },
 
   // Deployment operations
-  async deleteDeployedServer(serverId: string): Promise<void> {
-    await fetchWithErrorHandling(`${API_BASE_URL}/servers/${serverId}`, {
+  async deleteDeployedServer(serverId: string, namespace?: string): Promise<void> {
+    let url = `${API_BASE_URL}/servers/${serverId}`;
+    if (namespace) {
+      url += `?namespace=${encodeURIComponent(namespace)}`;
+    }
+
+    await fetchWithErrorHandling(url, {
       method: 'DELETE',
     });
   },
@@ -209,6 +256,30 @@ export const api = {
       }
     );
   },
+
+  // Orphaned servers
+  async getOrphanedServers(namespace?: string): Promise<OrphanedServersResponse> {
+    let url = `${API_BASE_URL}/orphaned-servers`;
+    if (namespace) {
+      url += `?namespace=${encodeURIComponent(namespace)}`;
+    }
+    return fetchWithErrorHandling(url);
+  },
+
+  async connectServerToRegistry(
+    serverId: string,
+    request: ConnectToRegistryRequest,
+    namespace?: string
+  ): Promise<{ status: string; message: string; server: any }> {
+    let url = `${API_BASE_URL}/orphaned-servers/${serverId}/connect`;
+    if (namespace) {
+      url += `?namespace=${encodeURIComponent(namespace)}`;
+    }
+    return fetchWithErrorHandling(url, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
 };
 
 export { ApiError };
@@ -219,5 +290,8 @@ export type {
   RegistryServersResponse,
   DeployedServersResponse,
   DeploymentConfig,
-  DeploymentResponse
+  DeploymentResponse,
+  OrphanedServer,
+  OrphanedServersResponse,
+  ConnectToRegistryRequest
 };

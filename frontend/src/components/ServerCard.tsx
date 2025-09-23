@@ -151,7 +151,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
               Tags:
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', gap: 0.5, overflowX: 'auto' }}>
               {server.tags.map((tag) => (
                 <Chip
                   key={tag}
@@ -172,7 +172,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
               Capabilities:
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', gap: 0.5, overflowX: 'auto' }}>
               {server.capabilities.map((capability) => (
                 <Chip
                   key={capability}

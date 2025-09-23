@@ -25,7 +25,11 @@ import {
   Tooltip,
   IconButton,
   TextField,
-  InputAdornment
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -37,9 +41,11 @@ import {
   Http as HttpIcon,
   GitHub as GitIcon,
   Search as SearchIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { DeployServerDialog } from './components/DeployServerDialog';
+import { OrphanedServersView } from './components/OrphanedServersView';
 import { api, DeploymentConfig } from './services/api';
 
 export interface Registry {
@@ -59,12 +65,6 @@ export interface Registry {
   };
 }
 
-interface ApiResponse {
-  registries: Registry[];
-  total: number;
-  limit: number;
-  offset: number;
-}
 
 interface Server {
   name: string;
@@ -140,23 +140,21 @@ const RegistryDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentNamespace, setCurrentNamespace] = useState('toolhive-system');
+  const [tabValue, setTabValue] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadRegistries = async () => {
       try {
-        console.log('Loading registries from API...');
-        const response = await fetch('/api/v1/registries');
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data: ApiResponse = await response.json();
-        console.log('Registries loaded:', data);
-
-        setRegistries(data.registries);
+        console.log('Loading registries from API for namespace:', currentNamespace);
+        setLoading(true);
         setError(null);
+
+        const registriesData = await api.getRegistries(currentNamespace);
+        console.log('Registries loaded:', registriesData);
+
+        setRegistries(registriesData);
       } catch (err) {
         console.error('Error loading registries:', err);
         setError(err instanceof Error ? err.message : 'Failed to load registries');
@@ -166,7 +164,7 @@ const RegistryDashboard: React.FC = () => {
     };
 
     loadRegistries();
-  }, []);
+  }, [currentNamespace]);
 
   const getStatusColor = (status: string): 'success' | 'error' | 'warning' | 'info' => {
     switch (status.toLowerCase()) {
@@ -193,12 +191,9 @@ const RegistryDashboard: React.FC = () => {
     setRefreshing(true);
     try {
       await fetch('/api/v1/registries/refresh', { method: 'POST' });
-      const response = await fetch('/api/v1/registries');
-      if (response.ok) {
-        const data: ApiResponse = await response.json();
-        setRegistries(data.registries);
-        setError(null);
-      }
+      const registriesData = await api.getRegistries(currentNamespace);
+      setRegistries(registriesData);
+      setError(null);
     } catch (err) {
       console.error('Error refreshing registries:', err);
       setError('Failed to refresh registries');
@@ -226,6 +221,10 @@ const RegistryDashboard: React.FC = () => {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
   };
 
   const getSourceIcon = (type: string) => {
@@ -268,9 +267,35 @@ const RegistryDashboard: React.FC = () => {
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Registry Dashboard
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h4" component="h1">
+            ToolHive Management
+          </Typography>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Namespace</InputLabel>
+            <Select
+              value={currentNamespace}
+              label="Namespace"
+              onChange={(e) => setCurrentNamespace(e.target.value)}
+            >
+              <MenuItem value="toolhive-system">toolhive-system</MenuItem>
+              <MenuItem value="default">default</MenuItem>
+              <MenuItem value="kube-system">kube-system</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Main Tab Navigation */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            aria-label="main navigation tabs"
+          >
+            <Tab label="Registries" {...a11yProps(0)} />
+            <Tab label="Unregistered Servers" {...a11yProps(1)} />
+          </Tabs>
+        </Box>
 
         {loading && (
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -285,22 +310,29 @@ const RegistryDashboard: React.FC = () => {
           </Alert>
         )}
 
-        {!loading && !error && (
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Found {registries.length} registries
-              </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={handleRefresh}
-                disabled={refreshing}
-                sx={{ minWidth: 120 }}
-              >
-                {refreshing ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
+        {/* Tab Content */}
+        <TabPanel value={tabValue} index={0}>
+          {!loading && !error && (
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Found {registries.length} registries
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing registries from namespace: {currentNamespace}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  sx={{ minWidth: 120 }}
+                >
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </Box>
 
             <Grid container spacing={3}>
               {registries.map((registry) => (
@@ -346,79 +378,97 @@ const RegistryDashboard: React.FC = () => {
                         </Typography>
                       )}
 
-                      {registry.source && (
-                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
-                            Source:
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              fontFamily: 'monospace',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            {registry.source.location}
-                          </Typography>
+                      {/* Combined Source and API Info */}
+                      {(registry.source || registry.url) && (
+                        <Box sx={{ mb: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          {/* Source Information */}
+                          {registry.source && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: registry.url ? 1 : 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
+                                Source:
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontSize: '0.875rem'
+                                }}
+                              >
+                                {registry.source.location}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* API Information */}
+                          {registry.url && (
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
+                                API:
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  mr: 1
+                                }}
+                              >
+                                {registry.url}
+                              </Typography>
+                              <Tooltip title="Copy API URL">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyToClipboard(registry.url);
+                                  }}
+                                >
+                                  <CopyIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          )}
                         </Box>
                       )}
 
-                      {registry.source?.syncInterval && (
-                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
-                            Sync:
-                          </Typography>
+                      {/* Registry Info Badges */}
+                      <Box sx={{ mb: 2, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {/* Sync Status Badge */}
+                        {registry.source?.syncInterval && (
                           <Chip
                             icon={<SyncIcon fontSize="small" />}
-                            label={registry.source.syncInterval}
+                            label={registry.source.syncInterval === 'manual' ? 'Manual' : `Auto (${registry.source.syncInterval})`}
                             size="small"
-                            color={registry.source.syncInterval === 'manual' ? 'default' : 'info'}
+                            color={registry.source.syncInterval === 'manual' ? 'default' : 'success'}
                             variant="outlined"
                           />
-                        </Box>
-                      )}
+                        )}
 
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Servers:</strong> {registry.serverCount}
-                      </Typography>
+                        {/* Server Count Badge */}
+                        <Chip
+                          label={`${registry.serverCount} Server${registry.serverCount !== 1 ? 's' : ''}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
 
-                      {registry.url && (
-                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '32px', mr: 1 }}>
-                            URL:
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              fontFamily: 'monospace',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              mr: 1
-                            }}
-                          >
-                            {registry.url}
-                          </Typography>
-                          <Tooltip title="Copy URL">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(registry.url);
-                              }}
-                            >
-                              <CopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      )}
+                        {/* Last Sync Badge */}
+                        <Chip
+                          label={registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
+                          size="small"
+                          color={registry.lastSyncAt ? 'info' : 'warning'}
+                          variant="outlined"
+                        />
+                      </Box>
 
                       <Typography variant="caption" display="block" sx={{ mt: 2 }}>
                         Created: {formatDate(registry.createdAt)}
@@ -445,13 +495,20 @@ const RegistryDashboard: React.FC = () => {
               ))}
             </Grid>
 
-            {registries.length === 0 && (
-              <Alert severity="info" sx={{ mt: 3 }}>
-                No registries found. Create your first registry to get started.
-              </Alert>
-            )}
-          </Box>
-        )}
+              {registries.length === 0 && (
+                <Alert severity="info" sx={{ mt: 3 }}>
+                  No registries found. Create your first registry to get started.
+                </Alert>
+              )}
+            </Box>
+          )}
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={1}>
+          <OrphanedServersView
+            currentNamespace={currentNamespace}
+          />
+        </TabPanel>
       </Container>
     </Box>
   );
@@ -480,6 +537,11 @@ const RegistryDetailPage: React.FC = () => {
   const [transportFilters, setTransportFilters] = useState<string[]>([]);
   const [tierFilters, setTierFilters] = useState<string[]>([]);
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [serverToDelete, setServerToDelete] = useState<Server | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -562,8 +624,8 @@ const RegistryDetailPage: React.FC = () => {
     });
   };
 
-  const filteredServers = filterServers(servers);
-  const filteredDeployedServers = filterServers(deployedServers);
+  const filteredServers = filterServers(servers).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredDeployedServers = filterServers(deployedServers).sort((a, b) => a.name.localeCompare(b.name));
 
   // Get unique values for filter badges
   const getAllTransports = () => {
@@ -646,10 +708,49 @@ const RegistryDetailPage: React.FC = () => {
 
     try {
       await api.deployServer(selectedRegistry.id, selectedServer.name, config);
+
+      // Close both dialogs after successful deployment
+      setDeployDialogOpen(false);
+      handleDialogClose(); // This closes the server popup
+
       // Optionally refresh deployed servers or show success message
     } catch (error) {
       throw error; // Let the dialog handle the error
     }
+  };
+
+  const handleDeleteServer = async () => {
+    if (!serverToDelete || !registryId) return;
+
+    setDeleting(true);
+    try {
+      // Call the delete API endpoint with namespace
+      await api.deleteDeployedServer(serverToDelete.name, serverToDelete.namespace);
+
+      // Refresh the deployed servers list
+      const deployedServersResponse = await fetch(`/api/v1/registries/${registryId}/deployed-servers`);
+      if (deployedServersResponse.ok) {
+        const deployedServersData = await deployedServersResponse.json();
+        setDeployedServers(deployedServersData.servers);
+      }
+
+      // Close dialog and reset state
+      setDeleteConfirmOpen(false);
+      setServerToDelete(null);
+    } catch (error) {
+      console.error('Error deleting server:', error);
+      // Still close the dialog and reset state on error
+      setDeleteConfirmOpen(false);
+      setServerToDelete(null);
+      // Could add error toast/notification here
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+    setServerToDelete(null);
   };
 
   if (loading) {
@@ -712,9 +813,19 @@ const RegistryDetailPage: React.FC = () => {
             </Breadcrumbs>
 
             <Paper elevation={2} sx={{ p: 3 }}>
-              <Typography variant="h4" component="h1" gutterBottom>
-                {registry.name}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                  {registry.name}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => window.location.reload()}
+                  size="small"
+                >
+                  Refresh
+                </Button>
+              </Box>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Typography variant="body2">
                   <strong>URL:</strong> {registry.url || 'Not specified'}
@@ -866,19 +977,24 @@ const RegistryDetailPage: React.FC = () => {
                 {filteredServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
+                      {/* Title */}
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          cursor: 'pointer',
+                          color: 'primary.main',
+                          '&:hover': { textDecoration: 'underline' },
+                          mb: 1
+                        }}
+                        onClick={() => handleServerClick(server, false)}
+                      >
+                        {server.name}
+                      </Typography>
+
+                      {/* Badges Row: Config badges on left, Status badges on right */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            cursor: 'pointer',
-                            color: 'primary.main',
-                            '&:hover': { textDecoration: 'underline' }
-                          }}
-                          onClick={() => handleServerClick(server, false)}
-                        >
-                          {server.name}
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                        {/* Left side: Configuration badges */}
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
                           {server.tier && (
                             <Chip
                               label={server.tier}
@@ -895,22 +1011,24 @@ const RegistryDetailPage: React.FC = () => {
                               variant="outlined"
                             />
                           )}
+                          {(server.tools_count !== undefined && server.tools_count > 0) && (
+                            <Chip
+                              label={`${server.tools_count} tools`}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                            />
+                          )}
                           {server.tags && server.tags.length > 0 && server.tags.slice(0, 2).map((tag) => (
                             <Chip key={tag} label={tag} size="small" />
                           ))}
                         </Box>
-                      </Box>
 
-                      {(server.tools_count !== undefined && server.tools_count > 0) && (
-                        <Box sx={{ mb: 1 }}>
-                          <Chip
-                            label={`${server.tools_count} tools`}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
+                        {/* Right side: Status badges */}
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                          {/* Available servers don't typically have status badges, this space is reserved for consistency */}
                         </Box>
-                      )}
+                      </Box>
 
                       {server.description && (
                         <Typography variant="body2" sx={{ mb: 2 }}>
@@ -948,19 +1066,24 @@ const RegistryDetailPage: React.FC = () => {
                 {filteredDeployedServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
+                      {/* Title */}
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          cursor: 'pointer',
+                          color: 'primary.main',
+                          '&:hover': { textDecoration: 'underline' },
+                          mb: 1
+                        }}
+                        onClick={() => handleServerClick(server, true)}
+                      >
+                        {server.name}
+                      </Typography>
+
+                      {/* Badges Row: Config badges on left, Status badges on right */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            cursor: 'pointer',
-                            color: 'primary.main',
-                            '&:hover': { textDecoration: 'underline' }
-                          }}
-                          onClick={() => handleServerClick(server, true)}
-                        >
-                          {server.name}
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                        {/* Left side: Configuration badges */}
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
                           {server.transport && (
                             <Chip
                               label={server.transport}
@@ -969,6 +1092,32 @@ const RegistryDetailPage: React.FC = () => {
                               variant="outlined"
                             />
                           )}
+                          {server.tier && (
+                            <Chip
+                              label={server.tier}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          )}
+                          {(server.tools_count !== undefined && server.tools_count > 0) && (
+                            <Chip
+                              label={`${server.tools_count} tools`}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                            />
+                          )}
+                          {server.tags && server.tags.length > 0 && server.tags
+                            .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
+                            .slice(0, 2)
+                            .map((tag) => (
+                              <Chip key={tag} label={tag} size="small" />
+                            ))}
+                        </Box>
+
+                        {/* Right side: Status badges */}
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                           {server.status && (
                             <Chip
                               label={server.status}
@@ -977,32 +1126,15 @@ const RegistryDetailPage: React.FC = () => {
                               variant="filled"
                             />
                           )}
-                          {server.tags && server.tags.length > 0 && server.tags
-                            .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
-                            .slice(0, 2)
-                            .map((tag) => (
-                              <Chip key={tag} label={tag} size="small" color="primary" />
-                            ))}
+                          {server.ready !== undefined && (
+                            <Chip
+                              label={server.ready ? 'Ready' : 'Not Ready'}
+                              size="small"
+                              color={server.ready ? 'success' : 'warning'}
+                              variant="filled"
+                            />
+                          )}
                         </Box>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1, alignItems: 'center' }}>
-                        {(server.tools_count !== undefined && server.tools_count > 0) && (
-                          <Chip
-                            label={`${server.tools_count} tools`}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        )}
-                        {server.ready !== undefined && (
-                          <Chip
-                            label={server.ready ? 'Ready' : 'Not Ready'}
-                            size="small"
-                            color={server.ready ? 'success' : 'warning'}
-                            variant="filled"
-                          />
-                        )}
                       </Box>
 
                       {server.image && (
@@ -1038,12 +1170,6 @@ const RegistryDetailPage: React.FC = () => {
                         </Box>
                       )}
 
-                      {server.description && (
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                          {server.description}
-                        </Typography>
-                      )}
-
                       {server.endpoint_url && (
                         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
                           <Typography
@@ -1074,16 +1200,31 @@ const RegistryDetailPage: React.FC = () => {
                         </Box>
                       )}
 
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
-                        {server.repository && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => window.open(server.repository, '_blank')}
-                          >
-                            Repository
-                          </Button>
-                        )}
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          {server.repository && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => window.open(server.repository, '_blank')}
+                            >
+                              Repository
+                            </Button>
+                          )}
+                        </Box>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setServerToDelete(server);
+                            setDeleteConfirmOpen(true);
+                          }}
+                        >
+                          Delete
+                        </Button>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1124,7 +1265,7 @@ const RegistryDetailPage: React.FC = () => {
                   )}
 
                   {/* Status and Transport Chips */}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, overflowX: 'auto' }}>
                     {selectedServer.transport && (
                       <Chip
                         label={selectedServer.transport}
@@ -1153,7 +1294,7 @@ const RegistryDetailPage: React.FC = () => {
 
                   {/* Statistics Section */}
                   {selectedServer.metadata && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
                       {selectedServer.metadata.stars !== undefined && (
                         <Chip
                           label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
@@ -1291,7 +1432,7 @@ const RegistryDetailPage: React.FC = () => {
                       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
                         🏷️ Tags
                       </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      <Box sx={{ display: 'flex', gap: 0.5, overflowX: 'auto' }}>
                         {selectedServer.tags
                           .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
                           .map((tag) => (
@@ -1451,6 +1592,43 @@ const RegistryDetailPage: React.FC = () => {
           registryName={selectedRegistry?.name || ''}
           onDeploy={handleDeploy}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteConfirmOpen}
+          onClose={handleDeleteCancel}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            Confirm Server Deletion
+          </DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete the server <strong>{serverToDelete?.name}</strong>?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              This action is equivalent to running: <code>kubectl delete mcpserver {serverToDelete?.name}</code>
+            </Typography>
+            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteServer}
+              color="error"
+              variant="contained"
+              disabled={deleting}
+              startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );
