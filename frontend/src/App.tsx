@@ -39,6 +39,8 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
+import { DeployServerDialog } from './components/DeployServerDialog';
+import { api, DeploymentConfig } from './services/api';
 
 export interface Registry {
   id: string;
@@ -467,7 +469,10 @@ const RegistryDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [deployDialogOpen, setDeployDialogOpen] = useState(false);
+  const [selectedRegistry, setSelectedRegistry] = useState<Registry | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [serverDialogTabValue, setServerDialogTabValue] = useState(0);
   const [_serverDetailsLoading, setServerDetailsLoading] = useState(false);
 
   // Search and filter state
@@ -524,6 +529,10 @@ const RegistryDetailPage: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleServerDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setServerDialogTabValue(newValue);
   };
 
 
@@ -618,6 +627,29 @@ const RegistryDetailPage: React.FC = () => {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedServer(null);
+    setServerDialogTabValue(0);
+  };
+
+  const handleDeployServer = () => {
+    if (selectedServer && registry) {
+      setSelectedRegistry(registry);
+      setDeployDialogOpen(true);
+    }
+  };
+
+  const handleDeployDialogClose = () => {
+    setDeployDialogOpen(false);
+  };
+
+  const handleDeploy = async (config: DeploymentConfig) => {
+    if (!selectedServer || !selectedRegistry) return;
+
+    try {
+      await api.deployServer(selectedRegistry.id, selectedServer.name, config);
+      // Optionally refresh deployed servers or show success message
+    } catch (error) {
+      throw error; // Let the dialog handle the error
+    }
   };
 
   if (loading) {
@@ -1150,9 +1182,23 @@ const RegistryDetailPage: React.FC = () => {
                   )}
                 </Box>
 
-                {/* Overview content only - tabs removed per user request */}
+                {/* Server Detail Tabs */}
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs
+                    value={serverDialogTabValue}
+                    onChange={handleServerDialogTabChange}
+                    aria-label="server detail tabs"
+                  >
+                    <Tab label="Overview" />
+                    <Tab label="Tools" />
+                    <Tab label="Config" />
+                    <Tab label="Manual Installation" />
+                  </Tabs>
+                </Box>
 
-                <Box sx={{ p: 3 }}>
+                {/* Tab Panel: Overview */}
+                {serverDialogTabValue === 0 && (
+                  <Box sx={{ p: 3 }}>
                   {/* Overview Content */}
 
                   {/* Technical Details Section */}
@@ -1254,7 +1300,111 @@ const RegistryDetailPage: React.FC = () => {
                       </Box>
                     </>
                   )}
-                </Box>
+                  </Box>
+                )}
+
+                {/* Tab Panel: Tools */}
+                {serverDialogTabValue === 1 && (
+                  <Box sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      🔧 Available Tools
+                    </Typography>
+                    {selectedServer.tools && selectedServer.tools.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {selectedServer.tools.map((tool, index) => (
+                          <Chip
+                            key={index}
+                            label={tool}
+                            size="medium"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ alignSelf: 'flex-start' }}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography color="text.secondary">
+                        No tools information available for this server.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
+                {/* Tab Panel: Config */}
+                {serverDialogTabValue === 2 && (
+                  <Box sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      ⚙️ Configuration
+                    </Typography>
+                    {selectedServer.env_vars && selectedServer.env_vars.length > 0 ? (
+                      <Box>
+                        <Typography variant="subtitle2" gutterBottom>Environment Variables:</Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {selectedServer.env_vars.map((envVar, index) => (
+                            <Box key={index} sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                {envVar.name}
+                                {envVar.required && <Chip label="Required" size="small" color="error" sx={{ ml: 1 }} />}
+                              </Typography>
+                              {envVar.description && (
+                                <Typography variant="body2" color="text.secondary">
+                                  {envVar.description}
+                                </Typography>
+                              )}
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Typography color="text.secondary">
+                        No configuration options available for this server.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
+                {/* Tab Panel: Manual Installation */}
+                {serverDialogTabValue === 3 && (
+                  <Box sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      📋 Manual Installation
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Use these commands to manually install and run this server:
+                    </Typography>
+
+                    <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                      <Typography variant="subtitle2" gutterBottom>Docker Command:</Typography>
+                      <Box sx={{ bgcolor: 'white', p: 1, borderRadius: 1, border: '1px solid', borderColor: 'grey.300', position: 'relative' }}>
+                        <code>
+                          docker run -p 8080:8080 {selectedServer.image}{selectedServer.version ? `:${selectedServer.version}` : ''}
+                        </code>
+                        <Tooltip title="Copy Command">
+                          <IconButton
+                            size="small"
+                            sx={{ position: 'absolute', top: 4, right: 4 }}
+                            onClick={() => copyToClipboard(`docker run -p 8080:8080 ${selectedServer.image}${selectedServer.version ? `:${selectedServer.version}` : ''}`)}
+                          >
+                            <CopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+
+                    {selectedServer.repository_url || selectedServer.repository ? (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>Source Repository:</Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<LaunchIcon />}
+                          onClick={() => window.open(selectedServer.repository_url || selectedServer.repository!, '_blank')}
+                        >
+                          View Source Code
+                        </Button>
+                      </Box>
+                    ) : null}
+                  </Box>
+                )}
 
               </DialogContent>
               <DialogActions>
@@ -1269,10 +1419,10 @@ const RegistryDetailPage: React.FC = () => {
                 {!selectedServer.endpoint_url && (
                   <Button
                     variant="contained"
-                    disabled
+                    onClick={handleDeployServer}
                     sx={{ ml: 'auto' }}
                   >
-                    Deploy (Not Implemented)
+                    Deploy
                   </Button>
                 )}
                 <Button onClick={handleDialogClose}>Close</Button>
@@ -1280,6 +1430,27 @@ const RegistryDetailPage: React.FC = () => {
             </>
           )}
         </Dialog>
+
+        {/* Deploy Server Dialog */}
+        <DeployServerDialog
+          open={deployDialogOpen}
+          onClose={handleDeployDialogClose}
+          server={selectedServer ? {
+            name: selectedServer.name,
+            image: selectedServer.image,
+            description: selectedServer.description,
+            tags: selectedServer.tags || [],
+            env: selectedServer.env_vars?.map(env => ({
+              name: env.name,
+              description: env.description,
+              required: env.required
+            })),
+            transport: selectedServer.transport
+          } : null}
+          registryId={selectedRegistry?.id || ''}
+          registryName={selectedRegistry?.name || ''}
+          onDeploy={handleDeploy}
+        />
       </Container>
     </Box>
   );

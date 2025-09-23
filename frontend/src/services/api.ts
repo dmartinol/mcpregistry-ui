@@ -1,6 +1,6 @@
 // API service for connecting frontend to backend endpoints
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 interface RegistryServer {
   name: string;
@@ -49,6 +49,42 @@ interface RegistryServersResponse {
 interface DeployedServersResponse {
   servers: DeployedServer[];
   total: number;
+}
+
+interface DeploymentConfig {
+  name: string;
+  image: string;
+  transport: 'streamable-http' | 'stdio';
+  targetPort: number;
+  port: number;
+  permissionProfile: {
+    type: 'builtin';
+    name: string;
+  };
+  resources: {
+    limits: {
+      cpu: string;
+      memory: string;
+    };
+    requests: {
+      cpu: string;
+      memory: string;
+    };
+  };
+  environmentVariables: Array<{
+    name: string;
+    value: string;
+  }>;
+  namespace: string;
+  registryName: string;
+  registryNamespace: string;
+}
+
+interface DeploymentResponse {
+  status: string;
+  message: string;
+  server: any;
+  manifest: string;
 }
 
 class ApiError extends Error {
@@ -158,7 +194,30 @@ export const api = {
       method: 'POST',
     });
   },
+
+  // Deploy server
+  async deployServer(
+    registryId: string,
+    serverName: string,
+    config: DeploymentConfig
+  ): Promise<DeploymentResponse> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/registries/${registryId}/servers/${serverName}/deploy`,
+      {
+        method: 'POST',
+        body: JSON.stringify(config),
+      }
+    );
+  },
 };
 
 export { ApiError };
-export type { Registry, RegistryServer, DeployedServer, RegistryServersResponse, DeployedServersResponse };
+export type {
+  Registry,
+  RegistryServer,
+  DeployedServer,
+  RegistryServersResponse,
+  DeployedServersResponse,
+  DeploymentConfig,
+  DeploymentResponse
+};

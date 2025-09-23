@@ -13,9 +13,10 @@ import {
   Paper,
 } from '@mui/material';
 import { Home as HomeIcon } from '@mui/icons-material';
-// import { ServerCard } from '../components/ServerCard';
-// import { DeployedServerCard } from '../components/DeployedServerCard';
-import { api } from '../services/api';
+import { ServerCard } from '../components/ServerCard';
+import { DeployedServerCard } from '../components/DeployedServerCard';
+import { DeployServerDialog } from '../components/DeployServerDialog';
+import { api, DeploymentConfig } from '../services/api';
 
 interface RegistryServer {
   name: string;
@@ -95,6 +96,8 @@ export const RegistryDetailPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [serversLoading, setServersLoading] = useState(false);
   const [deployedLoading, setDeployedLoading] = useState(false);
+  const [deployDialogOpen, setDeployDialogOpen] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<RegistryServer | null>(null);
 
   useEffect(() => {
     const loadRegistryDetails = async () => {
@@ -146,6 +149,37 @@ export const RegistryDetailPage: React.FC = () => {
 
   const handleBreadcrumbClick = () => {
     navigate('/');
+  };
+
+  const handleDeployServer = (server: RegistryServer) => {
+    setSelectedServer(server);
+    setDeployDialogOpen(true);
+  };
+
+  const handleDeployDialogClose = () => {
+    setDeployDialogOpen(false);
+    setSelectedServer(null);
+  };
+
+  const handleDeploy = async (config: DeploymentConfig) => {
+    if (!selectedServer || !registryId) return;
+
+    try {
+      await api.deployServer(registryId, selectedServer.name, config);
+
+      // Refresh deployed servers list
+      setDeployedLoading(true);
+      try {
+        const deployedData = await api.getDeployedServers(registryId);
+        setDeployedServers(deployedData.servers);
+      } catch (err) {
+        console.warn('Failed to refresh deployed servers:', err);
+      }
+      setDeployedLoading(false);
+
+    } catch (error) {
+      throw error; // Let the dialog handle the error
+    }
   };
 
   if (loading) {
@@ -244,11 +278,11 @@ export const RegistryDetailPage: React.FC = () => {
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
                 {availableServers.map((server) => (
-                  <Paper key={server.name} sx={{ p: 2 }}>
-                    <Typography variant="h6">{server.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">{server.image}</Typography>
-                    <Typography variant="body2">{server.description}</Typography>
-                  </Paper>
+                  <ServerCard
+                    key={server.name}
+                    server={server}
+                    onDeploy={() => handleDeployServer(server)}
+                  />
                 ))}
               </Box>
             )}
@@ -265,16 +299,25 @@ export const RegistryDetailPage: React.FC = () => {
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
                 {deployedServers.map((server) => (
-                  <Paper key={server.id} sx={{ p: 2 }}>
-                    <Typography variant="h6">{server.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">{server.status}</Typography>
-                    <Typography variant="body2">{server.endpoint}</Typography>
-                  </Paper>
+                  <DeployedServerCard
+                    key={server.id}
+                    server={server}
+                  />
                 ))}
               </Box>
             )}
           </TabPanel>
         </Paper>
+
+        {/* Deploy Server Dialog */}
+        <DeployServerDialog
+          open={deployDialogOpen}
+          onClose={handleDeployDialogClose}
+          server={selectedServer}
+          registryId={registryId || ''}
+          registryName={registry?.name || ''}
+          onDeploy={handleDeploy}
+        />
       </Box>
     </Container>
   );

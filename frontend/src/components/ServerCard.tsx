@@ -14,6 +14,7 @@ import {
   Description as DocsIcon,
   Person as PersonIcon,
   Image as ImageIcon,
+  PlayArrow as DeployIcon,
 } from '@mui/icons-material';
 
 interface RegistryServer {
@@ -31,12 +32,18 @@ interface RegistryServer {
 interface ServerCardProps {
   server: RegistryServer;
   onClick?: () => void;
+  onDeploy?: () => void;
 }
 
-export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick }) => {
+export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeploy }) => {
   const handleLinkClick = (event: React.MouseEvent, url: string) => {
     event.stopPropagation();
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDeployClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    onDeploy?.();
   };
 
   const getTagColor = (tag: string): 'primary' | 'secondary' | 'success' | 'warning' | 'info' => {
@@ -191,38 +198,59 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick }) => {
       </CardContent>
 
       {/* Footer with Action Links */}
-      {(server.repository || server.documentation) && (
+      {(server.repository || server.documentation || onDeploy) && (
         <Box
           sx={{
             px: 2,
             pb: 2,
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             gap: 1,
             borderTop: 1,
             borderColor: 'divider',
             pt: 1,
           }}
         >
-          {server.repository && (
-            <Tooltip title="View Repository">
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {server.repository && (
+              <Tooltip title="View Repository">
+                <IconButton
+                  size="small"
+                  onClick={(e) => handleLinkClick(e, server.repository!)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <GitHubIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {server.documentation && (
+              <Tooltip title="View Documentation">
+                <IconButton
+                  size="small"
+                  onClick={(e) => handleLinkClick(e, server.documentation!)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <DocsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+          {onDeploy && (
+            <Tooltip title="Deploy Server">
               <IconButton
                 size="small"
-                onClick={(e) => handleLinkClick(e, server.repository!)}
-                sx={{ color: 'text.secondary' }}
+                onClick={handleDeployClick}
+                sx={{
+                  color: 'primary.main',
+                  backgroundColor: 'primary.light',
+                  '&:hover': {
+                    backgroundColor: 'primary.main',
+                    color: 'white',
+                  },
+                }}
               >
-                <GitHubIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          {server.documentation && (
-            <Tooltip title="View Documentation">
-              <IconButton
-                size="small"
-                onClick={(e) => handleLinkClick(e, server.documentation!)}
-                sx={{ color: 'text.secondary' }}
-              >
-                <DocsIcon fontSize="small" />
+                <DeployIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}

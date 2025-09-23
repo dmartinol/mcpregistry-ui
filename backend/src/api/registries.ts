@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { RegistryService } from '../services/RegistryService';
 import { RegistryServerService } from '../services/RegistryServerService';
 import { DeployedServerService } from '../services/DeployedServerService';
+import { KubernetesClient } from '../services/KubernetesClient';
 import {
   validateCreateRegistry,
   validateUpdateRegistry,
@@ -13,6 +14,7 @@ const router = Router();
 const registryService = new RegistryService();
 const registryServerService = new RegistryServerService();
 const deployedServerService = new DeployedServerService();
+const kubernetesClient = new KubernetesClient();
 
 // GET /api/v1/registries
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -157,6 +159,38 @@ const deployedServersQuerySchema = Joi.object({
   namespace: Joi.string().optional(),
 });
 
+const deployServerSchema = Joi.object({
+  name: Joi.string().required().regex(/^[a-z0-9-]+$/).message('Name must be lowercase alphanumeric with hyphens only'),
+  image: Joi.string().required(),
+  transport: Joi.string().valid('streamable-http', 'stdio').required(),
+  targetPort: Joi.number().integer().min(1).max(65535).required(),
+  port: Joi.number().integer().min(1).max(65535).required(),
+  permissionProfile: Joi.object({
+    type: Joi.string().valid('builtin').required(),
+    name: Joi.string().required(),
+  }).required(),
+  resources: Joi.object({
+    limits: Joi.object({
+      cpu: Joi.string().required(),
+      memory: Joi.string().required(),
+    }).required(),
+    requests: Joi.object({
+      cpu: Joi.string().required(),
+      memory: Joi.string().required(),
+    }).required(),
+  }).required(),
+  environmentVariables: Joi.array().items(
+    Joi.object({
+      name: Joi.string().required(),
+      value: Joi.string().required(),
+      required: Joi.boolean().optional(),
+    })
+  ).default([]),
+  namespace: Joi.string().required(),
+  registryName: Joi.string().required(),
+  registryNamespace: Joi.string().required(),
+});
+
 // GET /api/v1/registries/:registryId/servers
 router.get('/:registryId/servers', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -299,6 +333,71 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Error refreshing registries:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/v1/registries/:registryId/servers/:serverName/deploy
+router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Validate server exists
+    const server = await registryServerService.getServerByName(req.params.registryId, req.params.serverName);
+    if (!server) {
+      res.status(404).json({ error: 'Server not found' });
+      return;
+    }
+
+    // Validate deployment configuration
+    const { error, value } = deployServerSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({
+        error: 'Invalid deployment configuration',
+        details: error.details.map((d: any) => d.message),
+      });
+      return;
+    }
+
+    // Check if a server with the same name already exists
+    const existingServer = await kubernetesClient.getMCPServer(value.name, value.namespace);
+    if (existingServer) {
+      res.status(409).json({ error: `Server with name '${value.name}' already exists in namespace '${value.namespace}'` });
+      return;
+    }
+
+    // Deploy the server
+    const deploymentConfig = {
+      ...value,
+      serverName: req.params.serverName,
+    };
+
+    const deployedServer = await kubernetesClient.deployMCPServer(deploymentConfig);
+
+    // Return the deployed server manifest
+    res.status(201).json({
+      status: 'success',
+      message: 'Server deployed successfully',
+      server: deployedServer,
+      manifest: JSON.stringify(deployedServer, null, 2),
+    });
+  } catch (error) {
+    console.error('Error deploying server:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('already exists')) {
+        res.status(409).json({ error: error.message });
+      } else if (error.message.includes('not found')) {
+        res.status(404).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: `Deployment failed: ${error.message}` });
+      }
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

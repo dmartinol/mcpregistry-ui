@@ -57,15 +57,35 @@ export interface MCPServer {
     name: string;
     namespace: string;
     creationTimestamp: string;
+    labels?: {
+      [key: string]: string;
+    };
     [key: string]: any;
   };
   spec: {
-    registryRef: {
+    image: string;
+    transport: 'streamable-http' | 'stdio';
+    targetPort: number;
+    port: number;
+    proxyMode?: 'streaming-http';
+    permissionProfile: {
+      type: 'builtin';
       name: string;
     };
-    serverName: string;
-    image: string;
-    version?: string;
+    resources: {
+      limits: {
+        cpu: string;
+        memory: string;
+      };
+      requests: {
+        cpu: string;
+        memory: string;
+      };
+    };
+    env?: Array<{
+      name: string;
+      value: string;
+    }>;
     [key: string]: any;
   };
   status?: {
@@ -541,6 +561,143 @@ export class KubernetesClient {
     } catch (error) {
       console.error('Error adding force sync annotation:', error);
       throw new Error(`Failed to trigger force sync for MCPRegistry ${name}`);
+    }
+  }
+
+  /**
+   * Deploy an MCPServer using the provided configuration
+   */
+  async deployMCPServer(serverConfig: {
+    name: string;
+    image: string;
+    transport: 'streamable-http' | 'stdio';
+    targetPort: number;
+    port: number;
+    permissionProfile: {
+      type: 'builtin';
+      name: string;
+    };
+    resources: {
+      limits: {
+        cpu: string;
+        memory: string;
+      };
+      requests: {
+        cpu: string;
+        memory: string;
+      };
+    };
+    environmentVariables: Array<{
+      name: string;
+      value: string;
+    }>;
+    namespace: string;
+    registryName: string;
+    registryNamespace: string;
+    serverName: string;
+  }): Promise<MCPServer> {
+    if (!this.customApi) {
+      throw new Error('Kubernetes client not available');
+    }
+
+    try {
+      const mcpServer: MCPServer = {
+        apiVersion: 'toolhive.stacklok.dev/v1alpha1',
+        kind: 'MCPServer',
+        metadata: {
+          name: serverConfig.name,
+          namespace: serverConfig.namespace,
+          creationTimestamp: new Date().toISOString(),
+          labels: {
+            'toolhive.stacklok.io/registry-name': serverConfig.registryName,
+            'toolhive.stacklok.io/registry-namespace': serverConfig.registryNamespace,
+            'toolhive.stacklok.io/server-name': serverConfig.serverName,
+          },
+        },
+        spec: {
+          image: serverConfig.image,
+          transport: serverConfig.transport,
+          targetPort: serverConfig.targetPort,
+          port: serverConfig.port,
+          ...(serverConfig.transport === 'stdio' && {
+            proxyMode: 'streaming-http',
+          }),
+          permissionProfile: serverConfig.permissionProfile,
+          resources: serverConfig.resources,
+          ...(serverConfig.environmentVariables.length > 0 && {
+            env: serverConfig.environmentVariables,
+          }),
+        },
+      };
+
+      console.log('Deploying MCPServer:', JSON.stringify(mcpServer, null, 2));
+
+      const response = await this.customApi.createNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        serverConfig.namespace,
+        'mcpservers',
+        mcpServer
+      );
+
+      return response.body as MCPServer;
+    } catch (error) {
+      console.error('Error deploying MCPServer:', error);
+      throw new Error(`Failed to deploy MCPServer: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get an MCPServer by name
+   */
+  async getMCPServer(name: string, namespace?: string): Promise<MCPServer | null> {
+    if (!this.customApi) {
+      console.warn('Kubernetes client not available');
+      return null;
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      const response = await this.customApi.getNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        targetNamespace,
+        'mcpservers',
+        name
+      );
+
+      return response.body as MCPServer;
+    } catch (error) {
+      if ((error as any).statusCode === 404) {
+        return null;
+      }
+      console.error('Error fetching MCPServer:', error);
+      throw new Error(`Failed to fetch MCPServer ${name}`);
+    }
+  }
+
+  /**
+   * Delete an MCPServer
+   */
+  async deleteMCPServer(name: string, namespace?: string): Promise<void> {
+    if (!this.customApi) {
+      throw new Error('Kubernetes client not available');
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      await this.customApi.deleteNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        targetNamespace,
+        'mcpservers',
+        name
+      );
+    } catch (error) {
+      console.error('Error deleting MCPServer:', error);
+      throw new Error(`Failed to delete MCPServer ${name}`);
     }
   }
 }
