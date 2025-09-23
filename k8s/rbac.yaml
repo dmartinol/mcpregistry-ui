@@ -1,0 +1,131 @@
+---
+# ServiceAccount for ToolHive Registry UI
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: toolhive-registry-ui
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: toolhive
+
+---
+# ClusterRole with permissions to manage MCP resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: toolhive-registry-ui
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: toolhive
+rules:
+# MCP Custom Resources permissions
+- apiGroups: ["toolhive.stacklok.dev"]
+  resources:
+  - mcpregistries
+  - mcpservers
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# MCP Custom Resources status permissions
+- apiGroups: ["toolhive.stacklok.dev"]
+  resources:
+  - mcpregistries/status
+  - mcpservers/status
+  verbs: ["get", "update", "patch"]
+
+# Core Kubernetes resources for service discovery and proxy
+- apiGroups: [""]
+  resources:
+  - services
+  - endpoints
+  verbs: ["get", "list", "watch"]
+
+# Permission to proxy requests to services (for registry API calls)
+- apiGroups: [""]
+  resources:
+  - services/proxy
+  verbs: ["get", "create"]
+
+# Permission to read ConfigMaps (for configuration)
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get", "list", "watch"]
+
+# Permission to read Secrets (for authentication credentials)
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding to bind the ServiceAccount to the ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: toolhive-registry-ui
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: toolhive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: toolhive-registry-ui
+subjects:
+- kind: ServiceAccount
+  name: toolhive-registry-ui
+  namespace: toolhive-system
+
+---
+# Optional: Namespace-scoped Role for additional namespace-level permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: toolhive-registry-ui-namespace
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: toolhive
+rules:
+# Permission to create/update events for logging
+- apiGroups: [""]
+  resources:
+  - events
+  verbs: ["create", "patch"]
+
+# Permission to manage pods for debugging/monitoring
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["get", "list", "watch"]
+
+# Permission to manage deployments for self-management
+- apiGroups: ["apps"]
+  resources:
+  - deployments
+  - replicasets
+  verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for namespace-scoped permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: toolhive-registry-ui-namespace
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: toolhive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: toolhive-registry-ui-namespace
+subjects:
+- kind: ServiceAccount
+  name: toolhive-registry-ui
+  namespace: toolhive-system

@@ -1,0 +1,82 @@
+---
+# ConfigMap for ToolHive Registry UI configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: toolhive-registry-ui-config
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: toolhive
+data:
+  # Application configuration
+  NODE_ENV: "production"
+  PORT: "3000"
+
+  # Kubernetes configuration
+  KUBERNETES_NAMESPACE: "toolhive-system"
+
+  # Default registry API endpoints (can be overridden)
+  DEFAULT_REGISTRY_ENDPOINTS: |
+    [
+      {
+        "name": "toolhive-git-registry",
+        "url": "http://toolhive-git-registry-api.toolhive-system.svc.cluster.local:8080",
+        "description": "Git-based registry for ToolHive MCP servers"
+      },
+      {
+        "name": "minimal-registry",
+        "url": "http://minimal-registry-api.toolhive-system.svc.cluster.local:8080",
+        "description": "Minimal registry for testing"
+      }
+    ]
+
+  # Logging configuration
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # API configuration
+  API_TIMEOUT_MS: "30000"
+  API_RETRY_ATTEMPTS: "3"
+
+  # Frontend configuration
+  REACT_APP_API_BASE_URL: "/api"
+  REACT_APP_TITLE: "ToolHive Registry Manager"
+
+  # Security headers
+  SECURITY_HEADERS: "true"
+  CORS_ORIGIN: "*"
+
+  # Health check configuration
+  HEALTH_CHECK_INTERVAL: "30"
+
+  # Cache configuration
+  CACHE_TTL_SECONDS: "300"
+
+  # Custom Resource API Groups
+  MCP_API_GROUP: "toolhive.stacklok.dev"
+  MCP_API_VERSION: "v1alpha1"
+
+---
+# Secret for sensitive configuration (example - should be created with actual values)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: toolhive-registry-ui-secrets
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: toolhive
+type: Opaque
+data:
+  # Example authentication tokens (base64 encoded)
+  # Replace these with actual values or remove if not needed
+  REGISTRY_AUTH_TOKEN: ""  # base64 encoded token
+  GITHUB_TOKEN: ""         # base64 encoded GitHub token for private registries
+  DATABASE_URL: ""         # base64 encoded database connection string if needed
+stringData:
+  # Example of plaintext secrets that will be automatically base64 encoded
+  # Remove or replace with actual values
+  SESSION_SECRET: "change-this-in-production"

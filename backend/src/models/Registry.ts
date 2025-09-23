@@ -32,6 +32,7 @@ export interface CreateRegistryRequest {
 
 export interface UpdateRegistryRequest {
   name?: string;
+  url?: string;
   description?: string;
   authConfig?: Registry['authConfig'];
 }

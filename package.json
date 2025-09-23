@@ -14,7 +14,10 @@
     "test:e2e": "cypress run",
     "test:e2e:open": "cypress open",
     "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
-    "format": "npm run format --workspace=backend && npm run format --workspace=frontend"
+    "format": "npm run format --workspace=backend && npm run format --workspace=frontend",
+    "typecheck": "npm run typecheck --workspace=backend && npm run typecheck --workspace=frontend",
+    "typecheck:watch": "concurrently \"npm run typecheck:watch --workspace=backend\" \"npm run typecheck:watch --workspace=frontend\"",
+    "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -22,6 +25,6 @@
     "@cypress/code-coverage": "^3.12.14"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

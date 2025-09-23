@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: toolhive-registry-ui
+  namespace: toolhive-system
+
+# Target namespace
+namespace: toolhive-system
+
+# Resources to include
+resources:
+- rbac.yaml
+- configmap.yaml
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+
+# Common labels for all resources
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/part-of: toolhive
+    app.kubernetes.io/managed-by: kustomize
+
+# Images to replace
+images:
+- name: toolhive/registry-ui
+  newTag: latest
+
+# ConfigMap generator for environment-specific config
+configMapGenerator:
+- name: toolhive-registry-ui-env
+  literals:
+  - ENVIRONMENT=production
+  - LOG_LEVEL=info
+
+# Secret generator (example - replace with actual secrets)
+secretGenerator:
+- name: toolhive-registry-ui-secrets-generated
+  literals:
+  - SESSION_SECRET=change-this-in-production
+
+# Patches for different environments
+patches:
+- target:
+    kind: Deployment
+    name: toolhive-registry-ui
+  patch: |-
+    - op: add
+      path: /spec/template/metadata/annotations/deployment.timestamp
+      value: "$(date +%s)"

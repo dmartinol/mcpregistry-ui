@@ -1,0 +1,73 @@
+---
+# Service for ToolHive Registry UI
+apiVersion: v1
+kind: Service
+metadata:
+  name: toolhive-registry-ui
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: toolhive
+  annotations:
+    # Service annotations for monitoring, load balancing, etc.
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: ui
+
+---
+# Optional: Headless service for direct pod access
+apiVersion: v1
+kind: Service
+metadata:
+  name: toolhive-registry-ui-headless
+  namespace: toolhive-system
+  labels:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: toolhive
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: toolhive-registry-ui
+    app.kubernetes.io/component: ui
+
+---
+# Optional: NodePort service for direct external access (alternative to Ingress)
+# Uncomment if you want to expose the service directly via NodePort
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: toolhive-registry-ui-nodeport
+#   namespace: toolhive-system
+#   labels:
+#     app.kubernetes.io/name: toolhive-registry-ui
+#     app.kubernetes.io/component: ui
+#     app.kubernetes.io/part-of: toolhive
+# spec:
+#   type: NodePort
+#   ports:
+#   - name: http
+#     port: 80
+#     targetPort: http
+#     protocol: TCP
+#     nodePort: 30080  # Change to desired port between 30000-32767
+#   selector:
+#     app.kubernetes.io/name: toolhive-registry-ui
+#     app.kubernetes.io/component: ui

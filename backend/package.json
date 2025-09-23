@@ -12,7 +12,9 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src tests --ext .ts",
     "lint:fix": "eslint src tests --ext .ts --fix",
-    "format": "prettier --write src tests"
+    "format": "prettier --write src tests",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch"
   },
   "dependencies": {
     "@kubernetes/client-node": "^0.20.0",
@@ -50,6 +52,6 @@
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

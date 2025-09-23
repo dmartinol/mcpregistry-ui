@@ -218,7 +218,7 @@ export const SimpleRegistryDetailPage: React.FC = () => {
                     </Typography>
                     {server.tags && server.tags.length > 0 && (
                       <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {server.tags.map((tag) => (
+                        {server.tags.map((tag: string) => (
                           <Typography key={tag} variant="caption" sx={{
                             bgcolor: 'primary.main',
                             color: 'white',

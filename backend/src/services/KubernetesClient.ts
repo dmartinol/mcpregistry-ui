@@ -320,7 +320,9 @@ export class KubernetesClient {
         uid: mcpRegistry.metadata.uid,
         phase: mcpRegistry.status?.phase,
       },
-      authConfig: mcpRegistry.spec.auth || { type: 'none' },
+      authConfig: mcpRegistry.spec.auth ?
+        { ...mcpRegistry.spec.auth, type: mcpRegistry.spec.auth.type as 'none' | 'basic' | 'bearer' | 'oauth' } :
+        { type: 'none' as const },
       source: sourceInfo,
     };
   }

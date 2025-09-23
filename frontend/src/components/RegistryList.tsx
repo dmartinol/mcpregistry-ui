@@ -19,7 +19,7 @@ import {
   Delete as DeleteIcon,
   Visibility as ViewIcon,
 } from '@mui/icons-material';
-import { Registry } from './RegistryDashboard';
+import { Registry } from '../App';
 
 interface RegistryListProps {
   registries: Registry[];

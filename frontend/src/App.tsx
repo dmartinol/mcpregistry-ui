@@ -22,10 +22,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
   Tooltip,
   IconButton,
   TextField,
@@ -44,7 +40,7 @@ import {
   Clear as ClearIcon
 } from '@mui/icons-material';
 
-interface Registry {
+export interface Registry {
   id: string;
   name: string;
   url: string;
@@ -53,6 +49,7 @@ interface Registry {
   description?: string;
   createdAt: string;
   updatedAt: string;
+  lastSyncAt?: string;
   source?: {
     type: 'configmap' | 'git' | 'http' | 'https';
     location: string;
@@ -471,7 +468,7 @@ const RegistryDetailPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [serverDetailsLoading, setServerDetailsLoading] = useState(false);
+  const [_serverDetailsLoading, setServerDetailsLoading] = useState(false);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
