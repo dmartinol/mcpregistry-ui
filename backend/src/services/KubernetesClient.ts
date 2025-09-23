@@ -136,23 +136,37 @@ export class KubernetesClient {
   }
 
   async getMCPRegistries(): Promise<MCPRegistry[]> {
+    console.log('=== getMCPRegistries called ===');
+    console.log('customApi available:', !!this.customApi);
+    console.log('namespace:', this.namespace);
+
     if (!this.customApi) {
       console.warn('Kubernetes client not available, returning empty registry list');
       return [];
     }
 
     try {
+      console.log('Calling listNamespacedCustomObject...');
       const response = await this.customApi.listNamespacedCustomObject(
         'toolhive.stacklok.dev',
         'v1alpha1',
         this.namespace,
         'mcpregistries'
       );
+      console.log('Response received, status:', response.response?.statusCode);
+      console.log('Response body type:', typeof response.body);
+      console.log('Response body items length:', (response.body as any)?.items?.length);
 
       const registries = (response.body as any).items || [];
+      console.log('Returning registries count:', registries.length);
       return registries as MCPRegistry[];
     } catch (error) {
-      console.error('Error fetching MCPRegistries:', error);
+      console.error('=== Error in getMCPRegistries ===');
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+      console.error('Full error object:', error);
       throw new Error('Failed to fetch MCPRegistries from Kubernetes');
     }
   }

@@ -19,8 +19,12 @@ const kubernetesClient = new KubernetesClient();
 // GET /api/v1/registries
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('=== GET /api/v1/registries called ===');
+    console.log('Query params:', req.query);
+
     const { error, value } = validateRegistryQuery(req.query);
     if (error) {
+      console.log('Validation error:', error.details);
       res.status(400).json({
         error: 'Invalid request parameters',
         details: error.details.map((d: any) => d.message),
@@ -29,17 +33,25 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     }
 
     const { status, limit, offset, namespace } = value;
+    console.log('Validated params:', { status, limit, offset, namespace });
 
     // Create a new registry service with the specified namespace if provided
     const serviceToUse = namespace
       ? new RegistryService(namespace)
       : registryService;
 
+    console.log('About to call getRegistries...');
     const result = await serviceToUse.getRegistries(status, limit, offset);
+    console.log('Successfully got registries:', result);
 
     res.json(result);
   } catch (error) {
-    console.error('Error listing registries:', error);
+    console.error('=== ERROR in GET /api/v1/registries ===');
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    console.error('Full error object:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

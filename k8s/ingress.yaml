@@ -12,8 +12,7 @@ metadata:
   annotations:
     # NGINX Ingress Controller annotations
     nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 
     # Enable CORS for API endpoints
     nginx.ingress.kubernetes.io/enable-cors: "true"
@@ -37,21 +36,12 @@ metadata:
 
     # Load balancing
     nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
-
-    # Certificate manager annotation (if using cert-manager)
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  # Ingress class (adjust based on your ingress controller)
+  # Ingress class for kind development
   ingressClassName: nginx
 
-  # TLS configuration
-  tls:
-  - hosts:
-    - registry.toolhive.local  # Replace with your actual domain
-    secretName: toolhive-registry-ui-tls
-
   rules:
-  - host: registry.toolhive.local  # Replace with your actual domain
+  - host: localhost  # For local kind development
     http:
       paths:
       # API routes

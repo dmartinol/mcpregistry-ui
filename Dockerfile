@@ -72,15 +72,15 @@ const path = require('path');
 const app = express();
 
 // Import backend routes
-const backendApp = require('./backend/dist/index.js');
+const { app: backendApp } = require('./backend/dist/app.js');
 
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
-// API routes
-app.use('/api', backendApp);
+// API routes - backend app already has /api/v1 routes, so mount at root
+app.use('/', backendApp);
 
-// Serve React app for all other routes
+// Serve React app for all other routes (this should come after API routes)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
 });

@@ -31,7 +31,7 @@ spec:
       serviceAccountName: toolhive-registry-ui
       containers:
       - name: registry-ui
-        image: localhost/toolhive/registry-ui:latest  # Replace with your actual image
+        image: docker.io/toolhive/registry-ui:latest  # Replace with your actual image
         imagePullPolicy: Always
         ports:
         - name: http
