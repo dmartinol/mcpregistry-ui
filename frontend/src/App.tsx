@@ -43,7 +43,7 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon,
   Delete as DeleteIcon,
-  Code as ManifestIcon
+  Code as ManifestIcon,
 } from '@mui/icons-material';
 import { DeployServerDialog } from './components/DeployServerDialog';
 import { OrphanedServersView } from './components/OrphanedServersView';
@@ -60,6 +60,12 @@ export interface Registry {
   createdAt: string;
   updatedAt: string;
   lastSyncAt?: string;
+  metadata?: {
+    namespace: string;
+    uid: string;
+    phase?: string;
+    [key: string]: any;
+  };
   source?: {
     type: 'configmap' | 'git' | 'http' | 'https';
     location: string;
@@ -93,6 +99,7 @@ interface Server {
     description: string;
     required: boolean;
     secret?: boolean;
+    default?: string;
   }>;
   metadata?: {
     last_updated?: string;
@@ -248,6 +255,8 @@ const RegistryDashboard: React.FC = () => {
       setLoadingManifest(false);
     }
   };
+
+
 
   const getSourceIcon = (type: string) => {
     switch (type) {
@@ -600,50 +609,135 @@ const RegistryDetailPage: React.FC = () => {
   const [manifest, setManifest] = useState<object | null>(null);
   const [manifestTitle, setManifestTitle] = useState('');
   const [loadingManifest, setLoadingManifest] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Helper functions for source click handling
+  const parseConfigMapLocation = (location: string) => {
+    const parts = location.split(':');
+    return {
+      name: parts[0],
+      key: parts[1] || undefined
+    };
+  };
+
+  const handleSourceClick = (registry: Registry) => {
+    if (!registry.source) return;
+
+    if (registry.source.type === 'configmap') {
+      const { name } = parseConfigMapLocation(registry.source.location);
+      handleShowConfigMapManifest(name, registry.metadata?.namespace || 'toolhive-system');
+    } else if (registry.source.type === 'git') {
+      // Open Git repository to the specific registry file
+      const gitLocation = registry.source.location;
+      console.log('Git location:', gitLocation);
+
+      // Parse the git location: repository@branch/path or repository@branch
+      let repository, branch, path;
+
+      if (gitLocation.includes('@')) {
+        const [repoUrl, branchAndPath] = gitLocation.split('@');
+        repository = repoUrl;
+
+        if (branchAndPath.includes('/')) {
+          const [branchName, ...pathParts] = branchAndPath.split('/');
+          branch = branchName;
+          path = pathParts.join('/');
+        } else {
+          branch = branchAndPath;
+          path = 'data/registry.json'; // Default path
+        }
+      } else {
+        // No branch specified, assume main branch
+        repository = gitLocation;
+        branch = 'main';
+        path = 'data/registry.json';
+      }
+
+      console.log('Parsed - repository:', repository, 'branch:', branch, 'path:', path);
+
+      // Construct the direct file URL for GitHub/GitLab
+      let fileUrl;
+      if (repository.includes('github.com')) {
+        fileUrl = `${repository}/blob/${branch}/${path}`;
+      } else if (repository.includes('gitlab.com')) {
+        fileUrl = `${repository}/-/blob/${branch}/${path}`;
+      } else {
+        // Fallback to repository root for other Git providers
+        fileUrl = repository;
+      }
+
+      console.log('Final URL:', fileUrl);
+      window.open(fileUrl, '_blank');
+    }
+  };
+
+  const handleShowConfigMapManifest = async (configMapName: string, namespace: string) => {
+    if (!registryId) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getConfigMapManifest(registryId, configMapName, namespace);
+      setManifest(manifestData);
+      setManifestTitle(`${configMapName} ConfigMap`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load ConfigMap manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
+  };
+
+  const loadData = async (isRefresh = false) => {
+    if (!registryId) {
+      setError('Registry ID is required');
+      if (!isRefresh) setLoading(false);
+      return;
+    }
+
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const registryResponse = await fetch(`/api/v1/registries/${registryId}`);
+      if (!registryResponse.ok) {
+        throw new Error(`Failed to load registry: ${registryResponse.statusText}`);
+      }
+      const registryData = await registryResponse.json();
+      setRegistry(registryData);
+
+      setServersLoading(true);
+      const serversResponse = await fetch(`/api/v1/registries/${registryId}/servers`);
+      if (serversResponse.ok) {
+        const serversData: ServersResponse = await serversResponse.json();
+        setServers(serversData.servers);
+      }
+      setServersLoading(false);
+
+      setDeployedServersLoading(true);
+      const deployedServersResponse = await fetch(`/api/v1/registries/${registryId}/deployed-servers`);
+      if (deployedServersResponse.ok) {
+        const deployedServersData: ServersResponse = await deployedServersResponse.json();
+        setDeployedServers(deployedServersData.servers);
+      }
+      setDeployedServersLoading(false);
+
+    } catch (err) {
+      console.error('Error loading registry details:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load registry details');
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!registryId) {
-        setError('Registry ID is required');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const registryResponse = await fetch(`/api/v1/registries/${registryId}`);
-        if (!registryResponse.ok) {
-          throw new Error(`Failed to load registry: ${registryResponse.statusText}`);
-        }
-        const registryData = await registryResponse.json();
-        setRegistry(registryData);
-
-        setServersLoading(true);
-        const serversResponse = await fetch(`/api/v1/registries/${registryId}/servers`);
-        if (serversResponse.ok) {
-          const serversData: ServersResponse = await serversResponse.json();
-          setServers(serversData.servers);
-        }
-        setServersLoading(false);
-
-        setDeployedServersLoading(true);
-        const deployedServersResponse = await fetch(`/api/v1/registries/${registryId}/deployed-servers`);
-        if (deployedServersResponse.ok) {
-          const deployedServersData: ServersResponse = await deployedServersResponse.json();
-          setDeployedServers(deployedServersData.servers);
-        }
-        setDeployedServersLoading(false);
-
-      } catch (err) {
-        console.error('Error loading registry details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load registry details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, [registryId]);
 
@@ -653,6 +747,10 @@ const RegistryDetailPage: React.FC = () => {
 
   const handleServerDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setServerDialogTabValue(newValue);
+  };
+
+  const handleRefresh = () => {
+    loadData(true);
   };
 
 
@@ -730,6 +828,10 @@ const RegistryDetailPage: React.FC = () => {
       const response = await fetch(endpoint);
       if (response.ok) {
         const detailedServer = await response.json();
+        // Debug chroma-mcp specifically in frontend
+        if (detailedServer.name === 'chroma-mcp') {
+          console.log('🔍 [CHROMA FRONTEND DEBUG] Received server with tags:', detailedServer.tags);
+        }
         setSelectedServer(detailedServer);
       } else {
         // Fallback to basic server data if endpoint fails
@@ -906,13 +1008,14 @@ const RegistryDetailPage: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
-                  onClick={() => window.location.reload()}
+                  onClick={handleRefresh}
                   size="small"
+                  disabled={refreshing}
                 >
-                  Refresh
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
                 </Button>
               </Box>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                 <Typography variant="body2">
                   <strong>URL:</strong> {registry.url || 'Not specified'}
                 </Typography>
@@ -922,7 +1025,51 @@ const RegistryDetailPage: React.FC = () => {
                 <Typography variant="body2">
                   <strong>Server Count:</strong> {registry.serverCount}
                 </Typography>
+                <Typography variant="body2">
+                  <strong>Namespace:</strong> {registry.metadata?.namespace || 'Unknown'}
+                </Typography>
               </Box>
+
+              {/* Source and Sync Policy Information */}
+              {(registry.source || registry.lastSyncAt) && (
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {registry.source && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="body2">
+                        <strong>{registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}:</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        {registry.source.location}
+                      </Typography>
+                      {(registry.source.type === 'configmap' || registry.source.type === 'git') && (
+                        <LaunchIcon
+                          fontSize="small"
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': {
+                              color: 'primary.dark',
+                            },
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSourceClick(registry);
+                          }}
+                        />
+                      )}
+                    </Box>
+                  )}
+                  {registry.source?.syncInterval && (
+                    <Typography variant="body2">
+                      <strong>Sync Policy:</strong> {registry.source.syncInterval === 'manual' ? 'Manual' : `Automatic (${registry.source.syncInterval})`}
+                    </Typography>
+                  )}
+                  {registry.lastSyncAt && (
+                    <Typography variant="body2">
+                      <strong>Last Sync:</strong> {new Date(registry.lastSyncAt).toLocaleString()}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Paper>
           </Box>
         </Container>
@@ -1473,9 +1620,6 @@ const RegistryDetailPage: React.FC = () => {
                   {/* Overview Content */}
 
                   {/* Technical Details Section */}
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-                    📋 Technical Details
-                  </Typography>
 
                   <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 2, fontFamily: 'monospace', fontSize: '0.875rem' }}>
                     <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -1568,6 +1712,12 @@ const RegistryDetailPage: React.FC = () => {
                           .map((tag) => (
                             <Chip key={tag} label={tag} size="small" />
                           ))}
+                        {/* Show all tags if none remain after filtering */}
+                        {selectedServer.tags.filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running').length === 0 &&
+                          selectedServer.tags.map((tag) => (
+                            <Chip key={tag} label={tag} size="small" />
+                          ))
+                        }
                       </Box>
                     </>
                   )}
@@ -1577,9 +1727,6 @@ const RegistryDetailPage: React.FC = () => {
                 {/* Tab Panel: Tools */}
                 {serverDialogTabValue === 1 && (
                   <Box sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      🔧 Available Tools
-                    </Typography>
                     {selectedServer.tools && selectedServer.tools.length > 0 ? (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {selectedServer.tools.map((tool, index) => (
@@ -1604,24 +1751,23 @@ const RegistryDetailPage: React.FC = () => {
                 {/* Tab Panel: Config */}
                 {serverDialogTabValue === 2 && (
                   <Box sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      ⚙️ Configuration
-                    </Typography>
                     {selectedServer.env_vars && selectedServer.env_vars.length > 0 ? (
                       <Box>
                         <Typography variant="subtitle2" gutterBottom>Environment Variables:</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                           {selectedServer.env_vars.map((envVar, index) => (
-                            <Box key={index} sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                {envVar.name}
-                                {envVar.required && <Chip label="Required" size="small" color="error" sx={{ ml: 1 }} />}
-                              </Typography>
-                              {envVar.description && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {envVar.description}
+                            <Box key={index} sx={{ bgcolor: 'grey.50', p: 1.5, borderRadius: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                  {envVar.name}
                                 </Typography>
-                              )}
+                                {envVar.required && <Chip label="Required" size="small" color="error" />}
+                                {envVar.secret && <Chip label="Secret" size="small" color="warning" />}
+                                <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                                  {envVar.description || 'No description available'}
+                                  {envVar.default && ` (Default: ${envVar.default})`}
+                                </Typography>
+                              </Box>
                             </Box>
                           ))}
                         </Box>
@@ -1720,6 +1866,7 @@ const RegistryDetailPage: React.FC = () => {
           } : null}
           registryId={selectedRegistry?.id || ''}
           registryName={selectedRegistry?.name || ''}
+          registryNamespace={selectedRegistry?.metadata?.namespace || 'toolhive-system'}
           onDeploy={handleDeploy}
         />
 

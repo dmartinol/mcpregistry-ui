@@ -199,12 +199,17 @@ export class RegistryServerService {
       throw new Error('Invalid registry response: expected array of servers');
     }
 
-    return servers.map((server: any) => ({
-      name: server.name || server.id,
-      image: server.image || `${server.name}:latest`,
-      version: server.version,
-      description: server.description || server.summary || `${server.status || 'Unknown'} server`,
-      tags: server.tags || server.keywords || (server.status && server.status !== 'Active' ? [server.status.toLowerCase()] : []),
+    return servers.map((server: any) => {
+      // Debug chroma-mcp specifically
+      if (server.name === 'chroma-mcp') {
+        console.log('🔍 [CHROMA DEBUG] Raw server data:', JSON.stringify(server, null, 2));
+      }
+      const transformedServer = {
+        name: server.name || server.id,
+        image: server.image || `${server.name}:latest`,
+        version: server.version,
+        description: server.description || server.summary || `${server.status || 'Unknown'} server`,
+        tags: server.tags || server.keywords || [],
       capabilities: server.capabilities || [],
       author: server.author || server.maintainer,
       repository: server.repository || server.source,
@@ -222,7 +227,15 @@ export class RegistryServerService {
       env_vars: server.env_vars || [],
       metadata: server.metadata,
       repository_url: server.repository_url,
-    }));
+    };
+
+      // Debug chroma-mcp specifically - log the transformed result
+      if (transformedServer.name === 'chroma-mcp') {
+        console.log('🔍 [CHROMA DEBUG] Transformed tags:', transformedServer.tags);
+      }
+
+      return transformedServer;
+    });
   }
 
   /**
@@ -519,7 +532,43 @@ export class RegistryServerService {
       console.warn(`Failed to fetch individual server ${serverName} from registry ${registryId}:`, error);
       // Fallback to list search
       const response = await this.getAvailableServers(registryId);
-      return response.servers.find(server => server.name === serverName) || null;
+      const server = response.servers.find(server => server.name === serverName);
+
+
+      if (server) {
+        // Fix tools_count vs tools mismatch
+        if (server.tools_count && server.tools_count > 0 && (!server.tools || server.tools.length === 0)) {
+          console.log(`Generating placeholder tools for server ${serverName} (${server.tools_count} tools)`);
+          server.tools = Array.from({ length: server.tools_count }, (_, i) => `Available Tool ${i + 1}`);
+        }
+
+        // Ensure env_vars is preserved - if it's missing from fallback, try to fetch from raw data
+        if (!server.env_vars || server.env_vars.length === 0) {
+          try {
+            const rawServerData = await this.fetchRawServerDataFromRegistry(registryId, serverName);
+            if (rawServerData && (rawServerData as any).env_vars) {
+              server.env_vars = (rawServerData as any).env_vars;
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch raw server data for env_vars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        // Ensure tags are preserved - if they're missing from fallback, try to fetch from raw data
+        if (!server.tags || server.tags.length === 0) {
+          try {
+            const rawServerData = await this.fetchRawServerDataFromRegistry(registryId, serverName);
+            if (rawServerData && ((rawServerData as any).tags || (rawServerData as any).keywords)) {
+              server.tags = (rawServerData as any).tags || (rawServerData as any).keywords || [];
+              console.log(`🔍 [CHROMA DEBUG] Restored tags from raw data for ${serverName}:`, server.tags);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch raw server data for tags: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      return server || null;
     }
   }
 
@@ -569,12 +618,17 @@ export class RegistryServerService {
    * This handles the enhanced data structure returned by /v0/servers/{name} endpoints
    */
   private transformIndividualServerResponse(data: any): RegistryServer {
-    return {
+    // Debug chroma-mcp specifically in individual transformation
+    if (data.name === 'chroma-mcp') {
+      console.log('🔍 [CHROMA DEBUG] Individual raw data:', JSON.stringify(data, null, 2));
+    }
+
+    const result = {
       name: data.name || data.id,
       image: data.image || `${data.name}:latest`,
       version: data.version,
       description: data.description || data.summary || `${data.status || 'Unknown'} server`,
-      tags: data.tags || data.keywords || (data.status && data.status !== 'Active' ? [data.status.toLowerCase()] : []),
+      tags: data.tags || data.keywords || [],
       capabilities: data.capabilities || [],
       author: data.author || data.maintainer,
       repository: data.repository || data.source,
@@ -593,6 +647,13 @@ export class RegistryServerService {
       metadata: data.metadata || null,
       repository_url: data.repository_url,
     };
+
+    // Debug chroma-mcp specifically in individual transformation
+    if (result.name === 'chroma-mcp') {
+      console.log('🔍 [CHROMA DEBUG] Individual transformed tags:', result.tags);
+    }
+
+    return result;
   }
 
   /**

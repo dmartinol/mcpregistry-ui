@@ -54,7 +54,7 @@ interface DeployedServersResponse {
 interface DeploymentConfig {
   name: string;
   image: string;
-  transport: 'streamable-http' | 'stdio';
+  transport: string; // Keep original server transport (stdio, http, streamable-http, sse, etc.)
   targetPort: number;
   port: number;
   permissionProfile: {
@@ -78,6 +78,7 @@ interface DeploymentConfig {
   namespace: string;
   registryName: string;
   registryNamespace: string;
+  proxyMode?: 'sse' | 'streamable-http';
 }
 
 interface DeploymentResponse {
@@ -90,7 +91,7 @@ interface DeploymentResponse {
 interface OrphanedServer {
   name: string;
   namespace: string;
-  transport: 'streamable-http' | 'stdio';
+  transport: 'stdio' | 'streamable-http' | 'sse';
   port: number;
   targetPort: number;
   url?: string;
@@ -305,6 +306,12 @@ export const api = {
   async getRegistryManifest(registryId: string): Promise<object> {
     return fetchWithErrorHandling(
       `${API_BASE_URL}/registries/${registryId}/manifest`
+    );
+  },
+
+  async getConfigMapManifest(registryId: string, configMapName: string, namespace: string = 'toolhive-system'): Promise<object> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/registries/${registryId}/configmap/${configMapName}/manifest?namespace=${namespace}`
     );
   },
 };

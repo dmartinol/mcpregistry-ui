@@ -43,13 +43,6 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
   const [manifest, setManifest] = useState<object | null>(null);
   const [loadingManifest, setLoadingManifest] = useState(false);
 
-  console.log('🚨 ServerCard DEBUG:', server.name, 'onShowManifest:', !!onShowManifest);
-  console.log('🚨 ServerCard has manifest callback:', typeof onShowManifest === 'function');
-
-  // Add alert for debugging
-  if (onShowManifest) {
-    console.log('🚨 MANIFEST CALLBACK EXISTS - BUTTON SHOULD BE VISIBLE!');
-  }
   const handleLinkClick = (event: React.MouseEvent, url: string) => {
     event.stopPropagation();
     window.open(url, '_blank', 'noopener,noreferrer');

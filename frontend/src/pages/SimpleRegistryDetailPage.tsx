@@ -137,7 +137,7 @@ export const SimpleRegistryDetailPage: React.FC = () => {
       const config = {
         name: server.name,
         image: server.image,
-        transport: 'streamable-http' as const,
+        transport: 'http' as const,
         targetPort: 8080,
         port: 8080,
         permissionProfile: {

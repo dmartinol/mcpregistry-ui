@@ -60,7 +60,7 @@ const CodeLine = styled('div')<{ indent: number; foldable: boolean; folded: bool
   display: folded ? 'none' : 'flex',
   alignItems: 'center',
   position: 'relative',
-  paddingLeft: `${80 + (indent * 10)}px`,
+  paddingLeft: '80px', // Fixed padding for line numbers, no extra indentation
   paddingRight: theme.spacing(2),
   paddingTop: '1px',
   paddingBottom: '1px',
@@ -275,7 +275,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
     if (!line.parentFoldId) return false;
 
     // Check if any parent fold is collapsed
-    let current = line.parentFoldId;
+    let current: string | undefined = line.parentFoldId;
     while (current) {
       if (foldState[current]) return true;
       // Find parent of current fold ID
@@ -443,7 +443,20 @@ function convertToYAML(obj: any, indent = 0): string {
 
   if (Array.isArray(obj)) {
     if (obj.length === 0) return '[]';
-    return obj.map(item => `${indentStr}- ${convertToYAML(item, 0).replace(/\n/g, `\n${indentStr} `)}`).join('\n');
+    return obj.map((item, index) => {
+      if (typeof item === 'object' && item !== null) {
+        // For array of objects, the first property starts right after the dash
+        const itemYaml = convertToYAML(item, 0); // No base indentation for the object
+        const lines = itemYaml.split('\n');
+        const firstLine = `${indentStr}- ${lines[0]}`;
+        const remainingLines = lines.slice(1).map(line => `${indentStr}  ${line}`);
+        return [firstLine, ...remainingLines].join('\n');
+      } else {
+        // For array of primitives
+        const itemYaml = convertToYAML(item, 0);
+        return `${indentStr}- ${itemYaml}`;
+      }
+    }).join('\n');
   }
 
   if (typeof obj === 'object') {
@@ -452,15 +465,27 @@ function convertToYAML(obj: any, indent = 0): string {
 
     return keys.map(key => {
       const value = obj[key];
-      const yamlValue = convertToYAML(value, indent + 1);
 
-      if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
-        return `${indentStr}${key}:\n${yamlValue.split('\n').map(line => ` ${line}`).join('\n')}`;
-      } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-        return `${indentStr}${key}:\n${yamlValue.split('\n').map(line => ` ${line}`).join('\n')}`;
-      } else {
-        return `${indentStr}${key}: ${yamlValue}`;
+      if (value === null || value === undefined) {
+        return `${indentStr}${key}: ${value === null ? 'null' : 'undefined'}`;
       }
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          return `${indentStr}${key}: []`;
+        }
+        const arrayYaml = convertToYAML(value, indent + 2);
+        return `${indentStr}${key}:\n${arrayYaml}`;
+      }
+
+      if (typeof value === 'object') {
+        const objectYaml = convertToYAML(value, indent + 2);
+        return `${indentStr}${key}:\n${objectYaml}`;
+      }
+
+      // Primitive values (string, number, boolean)
+      const primitiveYaml = convertToYAML(value, 0);
+      return `${indentStr}${key}: ${primitiveYaml}`;
     }).join('\n');
   }
 

@@ -180,7 +180,7 @@ const deployedServersQuerySchema = Joi.object({
 const deployServerSchema = Joi.object({
   name: Joi.string().required().regex(/^[a-z0-9-]+$/).message('Name must be lowercase alphanumeric with hyphens only'),
   image: Joi.string().required(),
-  transport: Joi.string().valid('streamable-http', 'stdio').required(),
+  transport: Joi.string().required(), // Accept any transport (stdio, http, streamable-http, sse, etc.)
   targetPort: Joi.number().integer().min(1).max(65535).required(),
   port: Joi.number().integer().min(1).max(65535).required(),
   permissionProfile: Joi.object({
@@ -207,6 +207,7 @@ const deployServerSchema = Joi.object({
   namespace: Joi.string().required(),
   registryName: Joi.string().required(),
   registryNamespace: Joi.string().required(),
+  proxyMode: Joi.string().valid('sse', 'streamable-http').optional(),
 });
 
 // GET /api/v1/registries/:registryId/servers
@@ -561,6 +562,29 @@ router.get('/:registryId/manifest', async (req: Request, res: Response): Promise
     res.json(registryManifest);
   } catch (error) {
     console.error('Error fetching registry manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/registries/:registryId/configmap/:configMapName/manifest
+router.get('/:registryId/configmap/:configMapName/manifest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { configMapName } = req.params;
+    const { namespace } = req.query;
+
+    // Use the namespace from query or default to the registry's namespace
+    const targetNamespace = (namespace as string) || 'toolhive-system';
+
+    // Fetch ConfigMap manifest from Kubernetes
+    const configMapManifest = await kubernetesClient.getConfigMap(configMapName, targetNamespace);
+    if (!configMapManifest) {
+      res.status(404).json({ error: 'ConfigMap not found' });
+      return;
+    }
+
+    res.json(configMapManifest);
+  } catch (error) {
+    console.error('Error fetching ConfigMap manifest:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

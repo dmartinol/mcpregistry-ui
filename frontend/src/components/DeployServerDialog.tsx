@@ -16,9 +16,10 @@ import {
   Chip,
   Alert,
   Paper,
-  Divider,
   Tooltip,
   CircularProgress,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -31,12 +32,36 @@ interface EnvironmentVariable {
   name: string;
   value: string;
   required: boolean;
+  description?: string;
+  secret?: boolean;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`deploy-tabpanel-${index}`}
+      aria-labelledby={`deploy-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
+    </div>
+  );
 }
 
 interface DeploymentConfig {
   name: string;
   image: string;
-  transport: 'streamable-http' | 'stdio';
+  transport: string; // Keep original server transport (stdio, http, streamable-http, sse, etc.)
   targetPort: number;
   port: number;
   permissionProfile: {
@@ -57,6 +82,7 @@ interface DeploymentConfig {
   namespace: string;
   registryName: string;
   registryNamespace: string;
+  proxyMode?: 'sse' | 'streamable-http';
 }
 
 interface Server {
@@ -69,6 +95,7 @@ interface Server {
     description?: string;
     required?: boolean;
     default?: string;
+    secret?: boolean;
   }>;
   transport?: string;
   port?: number;
@@ -80,6 +107,7 @@ interface DeployServerDialogProps {
   server: Server | null;
   registryId: string;
   registryName: string;
+  registryNamespace: string;
   onDeploy: (config: DeploymentConfig) => Promise<void>;
 }
 
@@ -89,12 +117,13 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   server,
   registryId: _registryId,
   registryName,
+  registryNamespace,
   onDeploy,
 }) => {
   const [config, setConfig] = useState<DeploymentConfig>({
     name: '',
     image: '',
-    transport: 'streamable-http',
+    transport: 'http',
     targetPort: 8080,
     port: 8080,
     permissionProfile: {
@@ -121,6 +150,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showManifest, setShowManifest] = useState(false);
   const [generatedManifest, setGeneratedManifest] = useState('');
+  const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
     if (server && open) {
@@ -128,6 +158,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
       setError(null);
       setShowManifest(false);
       setGeneratedManifest('');
+      setCurrentTab(0);
 
       // Generate default deployment name with counter logic
       const baseName = server.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -139,13 +170,24 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         name: env.name,
         value: env.default || '',
         required: env.required || false,
+        description: env.description,
+        secret: env.secret,
       })) || [];
+
+      // Keep the original server transport as-is
+      const originalTransport = server.transport || 'http';
+      let defaultProxyMode: 'sse' | 'streamable-http' | undefined;
+
+      // Set default proxy mode for stdio servers
+      if (originalTransport === 'stdio') {
+        defaultProxyMode = 'streamable-http'; // Default to streamable-http (SSE is legacy)
+      }
 
       setConfig({
         name: defaultName,
         image: server.image,
-        transport: (server.transport as 'streamable-http' | 'stdio') || 'streamable-http',
-        targetPort: server.port || 8080,
+        transport: originalTransport, // Keep original transport
+        targetPort: server.port || 8080, // All servers need a valid target port (1-65535)
         port: server.port || 8080,
         permissionProfile: {
           type: 'builtin',
@@ -162,12 +204,13 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
           },
         },
         environmentVariables: envVars,
-        namespace: 'toolhive-system',
+        namespace: registryNamespace,
         registryName: registryName,
-        registryNamespace: 'toolhive-system',
+        registryNamespace: registryNamespace,
+        proxyMode: defaultProxyMode,
       });
     }
-  }, [server, open, registryName]);
+  }, [server, open, registryName, registryNamespace]);
 
   const generateManifest = () => {
     const manifest = {
@@ -187,8 +230,8 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         transport: config.transport,
         targetPort: config.targetPort,
         port: config.port,
-        ...(config.transport === 'stdio' && {
-          proxyMode: 'streaming-http',
+        ...(config.proxyMode && {
+          proxyMode: config.proxyMode,
         }),
         permissionProfile: config.permissionProfile,
         resources: config.resources,
@@ -245,7 +288,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
       ...config,
       environmentVariables: [
         ...config.environmentVariables,
-        { name: '', value: '', required: false },
+        { name: '', value: '', required: false, description: undefined, secret: false },
       ],
     });
   };
@@ -259,10 +302,13 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
     navigator.clipboard.writeText(generatedManifest);
   };
 
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
   const permissionProfiles = [
-    { value: 'network', label: 'Network Access' },
-    { value: 'filesystem', label: 'Filesystem Access' },
-    { value: 'minimal', label: 'Minimal Permissions' },
+    { value: 'none', label: 'None (No permissions)' },
+    { value: 'network', label: 'Network (Network access permissions)' },
   ];
 
   if (!server) return null;
@@ -278,211 +324,268 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         </Box>
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent sx={{ p: 0 }}>
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ m: 2 }}>
             {error}
           </Alert>
         )}
 
         {!showManifest ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Basic Configuration */}
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>Basic Configuration</Typography>
+          <Box>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs
+                value={currentTab}
+                onChange={handleTabChange}
+                aria-label="deployment configuration tabs"
+                sx={{ px: 2 }}
+              >
+                <Tab
+                  label="Server"
+                  id="deploy-tab-0"
+                  aria-controls="deploy-tabpanel-0"
+                />
+                <Tab
+                  label="Environment Variables"
+                  id="deploy-tab-1"
+                  aria-controls="deploy-tabpanel-1"
+                />
+                <Tab
+                  label="Resources"
+                  id="deploy-tab-2"
+                  aria-controls="deploy-tabpanel-2"
+                />
+              </Tabs>
+            </Box>
 
-              <TextField
-                fullWidth
-                label="Deployment Name"
-                value={config.name}
-                onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                helperText="Must be a valid Kubernetes resource name"
-                sx={{ mb: 2 }}
-              />
+            <Box sx={{ px: 2, pb: 2 }}>
+              <TabPanel value={currentTab} index={0}>
+                {/* Server Configuration */}
 
-              <TextField
-                fullWidth
-                label="Container Image"
-                value={config.image}
-                onChange={(e) => setConfig({ ...config, image: e.target.value })}
-                disabled
-                sx={{ mb: 2 }}
-              />
+                <TextField
+                  fullWidth
+                  label="Deployment Name"
+                  value={config.name}
+                  onChange={(e) => setConfig({ ...config, name: e.target.value })}
+                  helperText="Must be a valid Kubernetes resource name"
+                  sx={{ mb: 2 }}
+                />
 
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Transport</InputLabel>
-                <Select
-                  value={config.transport}
+                <TextField
+                  fullWidth
+                  label="Container Image"
+                  value={config.image}
+                  onChange={(e) => setConfig({ ...config, image: e.target.value })}
+                  disabled
+                  sx={{ mb: 2 }}
+                />
+
+                <TextField
+                  fullWidth
                   label="Transport"
-                  onChange={(e) => setConfig({ ...config, transport: e.target.value as 'streamable-http' | 'stdio' })}
-                >
-                  <MenuItem value="streamable-http">Streamable HTTP</MenuItem>
-                  <MenuItem value="stdio">STDIO</MenuItem>
-                </Select>
-              </FormControl>
-
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                <TextField
-                  label="Target Port"
-                  type="number"
-                  value={config.targetPort}
-                  onChange={(e) => setConfig({ ...config, targetPort: parseInt(e.target.value) })}
-                  sx={{ flex: 1 }}
+                  value={config.transport}
+                  disabled
+                  helperText="Transport is determined by the server configuration"
+                  sx={{ mb: 2 }}
                 />
-                <TextField
-                  label="Service Port"
-                  type="number"
-                  value={config.port}
-                  onChange={(e) => setConfig({ ...config, port: parseInt(e.target.value) })}
-                  sx={{ flex: 1 }}
-                />
-              </Box>
 
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Permission Profile</InputLabel>
-                <Select
-                  value={config.permissionProfile.name}
-                  label="Permission Profile"
-                  onChange={(e) => setConfig({
-                    ...config,
-                    permissionProfile: { ...config.permissionProfile, name: e.target.value }
-                  })}
-                >
-                  {permissionProfiles.map(profile => (
-                    <MenuItem key={profile.value} value={profile.value}>
-                      {profile.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <TextField
-                fullWidth
-                label="Namespace"
-                value={config.namespace}
-                onChange={(e) => setConfig({ ...config, namespace: e.target.value })}
-                sx={{ mb: 2 }}
-              />
-            </Box>
-
-            <Divider />
-
-            {/* Environment Variables */}
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Environment Variables</Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  onClick={addEnvironmentVariable}
-                  size="small"
-                >
-                  Add Variable
-                </Button>
-              </Box>
-
-              {config.environmentVariables.map((envVar, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'flex-start' }}>
-                  <TextField
-                    label="Name"
-                    value={envVar.name}
-                    onChange={(e) => handleEnvVarChange(index, 'name', e.target.value)}
-                    sx={{ flex: 1 }}
-                    disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
-                  />
-                  <TextField
-                    label="Value"
-                    value={envVar.value}
-                    onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
-                    sx={{ flex: 2 }}
-                    required={envVar.required}
-                    error={envVar.required && !envVar.value.trim()}
-                  />
-                  <Box sx={{ display: 'flex', alignItems: 'center', minHeight: '56px' }}>
-                    {envVar.required && (
-                      <Chip label="Required" size="small" color="warning" sx={{ mr: 1 }} />
-                    )}
-                    <IconButton
-                      onClick={() => removeEnvironmentVariable(index)}
-                      disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
+                {config.transport === 'stdio' && (
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Proxy Mode</InputLabel>
+                    <Select
+                      value={config.proxyMode || ''}
+                      label="Proxy Mode"
+                      onChange={(e) => setConfig({ ...config, proxyMode: e.target.value as 'sse' | 'streamable-http' })}
                     >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
+                      <MenuItem value="sse">SSE</MenuItem>
+                      <MenuItem value="streamable-http">Streamable HTTP</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <TextField
+                    label="Target Port"
+                    type="number"
+                    value={config.targetPort}
+                    onChange={(e) => setConfig({ ...config, targetPort: parseInt(e.target.value) })}
+                    disabled={config.transport === 'stdio'}
+                    sx={{ flex: 1 }}
+                    helperText={config.transport === 'stdio' ? "Not applicable for stdio transport" : "Port where the MCP server is listening (1-65535)"}
+                  />
+                  <TextField
+                    label="Service Port"
+                    type="number"
+                    value={config.port}
+                    onChange={(e) => setConfig({ ...config, port: parseInt(e.target.value) })}
+                    sx={{ flex: 1 }}
+                    helperText="Port for the Kubernetes service"
+                  />
                 </Box>
-              ))}
 
-              {config.environmentVariables.length === 0 && (
-                <Typography color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  No environment variables configured
-                </Typography>
-              )}
-            </Box>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Permission Profile</InputLabel>
+                  <Select
+                    value={config.permissionProfile.name}
+                    label="Permission Profile"
+                    onChange={(e) => setConfig({
+                      ...config,
+                      permissionProfile: { ...config.permissionProfile, name: e.target.value }
+                    })}
+                  >
+                    {permissionProfiles.map(profile => (
+                      <MenuItem key={profile.value} value={profile.value}>
+                        {profile.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-            <Divider />
-
-            {/* Resource Configuration */}
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>Resource Configuration</Typography>
-
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Limits</Typography>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <TextField
-                  label="CPU Limit"
-                  value={config.resources.limits.cpu}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    resources: {
-                      ...config.resources,
-                      limits: { ...config.resources.limits, cpu: e.target.value }
-                    }
-                  })}
-                  sx={{ flex: 1 }}
-                  helperText="e.g., 100m, 0.5"
+                  fullWidth
+                  label="Namespace"
+                  value={config.namespace}
+                  disabled
+                  helperText="Namespace is determined by the registry configuration"
                 />
-                <TextField
-                  label="Memory Limit"
-                  value={config.resources.limits.memory}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    resources: {
-                      ...config.resources,
-                      limits: { ...config.resources.limits, memory: e.target.value }
-                    }
-                  })}
-                  sx={{ flex: 1 }}
-                  helperText="e.g., 128Mi, 1Gi"
-                />
-              </Box>
+              </TabPanel>
 
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Requests</Typography>
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  label="CPU Request"
-                  value={config.resources.requests.cpu}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    resources: {
-                      ...config.resources,
-                      requests: { ...config.resources.requests, cpu: e.target.value }
-                    }
-                  })}
-                  sx={{ flex: 1 }}
-                  helperText="e.g., 50m, 0.1"
-                />
-                <TextField
-                  label="Memory Request"
-                  value={config.resources.requests.memory}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    resources: {
-                      ...config.resources,
-                      requests: { ...config.resources.requests, memory: e.target.value }
-                    }
-                  })}
-                  sx={{ flex: 1 }}
-                  helperText="e.g., 64Mi, 512Mi"
-                />
-              </Box>
+              <TabPanel value={currentTab} index={1}>
+                {/* Environment Variables */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Environment Variables</Typography>
+                  <Button
+                    startIcon={<AddIcon />}
+                    onClick={addEnvironmentVariable}
+                    size="small"
+                  >
+                    Add Variable
+                  </Button>
+                </Box>
+
+                {config.environmentVariables.map((envVar, index) => (
+                  <Box key={index} sx={{ mb: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    {/* Variable name, badges, and description in one row */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                        {envVar.name || 'New Variable'}
+                      </Typography>
+                      {envVar.required && (
+                        <Chip label="Required" size="small" color="error" />
+                      )}
+                      {envVar.secret && (
+                        <Chip label="Secret" size="small" color="warning" />
+                      )}
+                      {envVar.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ flex: 1, ml: 1 }}>
+                          {envVar.description}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Input fields */}
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                      <TextField
+                        label="Name"
+                        value={envVar.name}
+                        onChange={(e) => handleEnvVarChange(index, 'name', e.target.value)}
+                        sx={{ flex: 1 }}
+                        size="small"
+                        disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
+                      />
+                      <TextField
+                        label="Value"
+                        value={envVar.value}
+                        onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
+                        sx={{ flex: 2 }}
+                        size="small"
+                        required={envVar.required}
+                        error={envVar.required && !envVar.value.trim()}
+                        type={envVar.secret ? 'password' : 'text'}
+                        helperText={envVar.secret ? 'This is a secret value' : ''}
+                      />
+                      <IconButton
+                        onClick={() => removeEnvironmentVariable(index)}
+                        disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
+
+                {config.environmentVariables.length === 0 && (
+                  <Typography color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    No environment variables configured
+                  </Typography>
+                )}
+              </TabPanel>
+
+              <TabPanel value={currentTab} index={2}>
+                {/* Resource Configuration */}
+                <Typography variant="h6" sx={{ mb: 2 }}>Resource Configuration</Typography>
+
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Limits</Typography>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <TextField
+                    label="CPU Limit"
+                    value={config.resources.limits.cpu}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      resources: {
+                        ...config.resources,
+                        limits: { ...config.resources.limits, cpu: e.target.value }
+                      }
+                    })}
+                    sx={{ flex: 1 }}
+                    helperText="e.g., 100m, 0.5"
+                  />
+                  <TextField
+                    label="Memory Limit"
+                    value={config.resources.limits.memory}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      resources: {
+                        ...config.resources,
+                        limits: { ...config.resources.limits, memory: e.target.value }
+                      }
+                    })}
+                    sx={{ flex: 1 }}
+                    helperText="e.g., 128Mi, 1Gi"
+                  />
+                </Box>
+
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Requests</Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    label="CPU Request"
+                    value={config.resources.requests.cpu}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      resources: {
+                        ...config.resources,
+                        requests: { ...config.resources.requests, cpu: e.target.value }
+                      }
+                    })}
+                    sx={{ flex: 1 }}
+                    helperText="e.g., 50m, 0.1"
+                  />
+                  <TextField
+                    label="Memory Request"
+                    value={config.resources.requests.memory}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      resources: {
+                        ...config.resources,
+                        requests: { ...config.resources.requests, memory: e.target.value }
+                      }
+                    })}
+                    sx={{ flex: 1 }}
+                    helperText="e.g., 64Mi, 512Mi"
+                  />
+                </Box>
+              </TabPanel>
             </Box>
           </Box>
         ) : (

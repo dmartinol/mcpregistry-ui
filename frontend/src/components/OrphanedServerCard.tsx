@@ -23,7 +23,7 @@ import { ManifestViewer } from './ManifestViewer';
 export interface OrphanedServer {
   name: string;
   namespace: string;
-  transport: 'streamable-http' | 'stdio';
+  transport: 'stdio' | 'streamable-http' | 'sse';
   port: number;
   targetPort: number;
   url?: string;

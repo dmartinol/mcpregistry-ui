@@ -12,10 +12,11 @@ import {
   Container,
   Paper,
 } from '@mui/material';
-import { Home as HomeIcon } from '@mui/icons-material';
+import { Home as HomeIcon, Launch as LaunchIcon } from '@mui/icons-material';
 import { ServerCard } from '../components/ServerCard';
 import { DeployedServerCard } from '../components/DeployedServerCard';
 import { DeployServerDialog } from '../components/DeployServerDialog';
+import { ManifestViewer } from '../components/ManifestViewer';
 import { api, DeploymentConfig } from '../services/api';
 
 interface RegistryServer {
@@ -53,6 +54,18 @@ interface Registry {
   serverCount: number;
   createdAt: string;
   updatedAt: string;
+  lastSyncAt?: string;
+  metadata?: {
+    namespace: string;
+    uid: string;
+    phase?: string;
+    [key: string]: any;
+  };
+  source?: {
+    type: 'configmap' | 'git' | 'http' | 'https';
+    location: string;
+    syncInterval?: string;
+  };
 }
 
 interface TabPanelProps {
@@ -98,6 +111,12 @@ export const RegistryDetailPage: React.FC = () => {
   const [deployedLoading, setDeployedLoading] = useState(false);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState<RegistryServer | null>(null);
+
+  // Manifest viewer state
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [manifestTitle, setManifestTitle] = useState('');
+  const [, setLoadingManifest] = useState(false);
 
   useEffect(() => {
     const loadRegistryDetails = async () => {
@@ -208,6 +227,81 @@ export const RegistryDetailPage: React.FC = () => {
     }
   };
 
+  const handleShowConfigMapManifest = async (configMapName: string, namespace: string) => {
+    if (!registryId) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getConfigMapManifest(registryId, configMapName, namespace);
+      setManifest(manifestData);
+      setManifestTitle(`${configMapName} ConfigMap`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load ConfigMap manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
+  };
+
+  const parseConfigMapLocation = (location: string) => {
+    const parts = location.split(':');
+    return {
+      name: parts[0],
+      key: parts[1] || undefined
+    };
+  };
+
+  const handleSourceClick = (registry: Registry) => {
+    if (!registry.source) return;
+
+    if (registry.source.type === 'configmap') {
+      const { name } = parseConfigMapLocation(registry.source.location);
+      handleShowConfigMapManifest(name, registry.metadata?.namespace || 'toolhive-system');
+    } else if (registry.source.type === 'git') {
+      // Open Git repository to the specific registry file
+      const gitLocation = registry.source.location;
+      console.log('Git location:', gitLocation);
+
+      // Parse the git location: repository@branch/path or repository@branch
+      let repository, branch, path;
+
+      if (gitLocation.includes('@')) {
+        const [repoUrl, branchAndPath] = gitLocation.split('@');
+        repository = repoUrl;
+
+        if (branchAndPath.includes('/')) {
+          const [branchName, ...pathParts] = branchAndPath.split('/');
+          branch = branchName;
+          path = pathParts.join('/');
+        } else {
+          branch = branchAndPath;
+          path = 'data/registry.json'; // Default path
+        }
+      } else {
+        // No branch specified, assume main branch
+        repository = gitLocation;
+        branch = 'main';
+        path = 'data/registry.json';
+      }
+
+      console.log('Parsed - repository:', repository, 'branch:', branch, 'path:', path);
+
+      // Construct the direct file URL for GitHub/GitLab
+      let fileUrl;
+      if (repository.includes('github.com')) {
+        fileUrl = `${repository}/blob/${branch}/${path}`;
+      } else if (repository.includes('gitlab.com')) {
+        fileUrl = `${repository}/-/blob/${branch}/${path}`;
+      } else {
+        // Fallback to repository root for other Git providers
+        fileUrl = repository;
+      }
+
+      console.log('Final URL:', fileUrl);
+      window.open(fileUrl, '_blank');
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -267,7 +361,7 @@ export const RegistryDetailPage: React.FC = () => {
             </Typography>
           )}
 
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
             <Typography variant="body2">
               <strong>URL:</strong> {registry.url}
             </Typography>
@@ -277,7 +371,51 @@ export const RegistryDetailPage: React.FC = () => {
             <Typography variant="body2">
               <strong>Server Count:</strong> {registry.serverCount}
             </Typography>
+            <Typography variant="body2">
+              <strong>Namespace:</strong> {registry.metadata?.namespace || 'Unknown'}
+            </Typography>
           </Box>
+
+          {/* Source and Sync Policy Information */}
+          {(registry.source || registry.lastSyncAt) && (
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              {registry.source && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="body2">
+                    <strong>{registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}:</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    {registry.source.location}
+                  </Typography>
+                  {(registry.source.type === 'configmap' || registry.source.type === 'git') && (
+                    <LaunchIcon
+                      fontSize="small"
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: 'primary.dark',
+                        },
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSourceClick(registry);
+                      }}
+                    />
+                  )}
+                </Box>
+              )}
+              {registry.source?.syncInterval && (
+                <Typography variant="body2">
+                  <strong>Sync Policy:</strong> {registry.source.syncInterval === 'manual' ? 'Manual' : `Automatic (${registry.source.syncInterval})`}
+                </Typography>
+              )}
+              {registry.lastSyncAt && (
+                <Typography variant="body2">
+                  <strong>Last Sync:</strong> {new Date(registry.lastSyncAt).toLocaleString()}
+                </Typography>
+              )}
+            </Box>
+          )}
         </Paper>
 
         {/* Tabs for Available/Deployed Servers */}
@@ -344,8 +482,19 @@ export const RegistryDetailPage: React.FC = () => {
           server={selectedServer}
           registryId={registryId || ''}
           registryName={registry?.name || ''}
+          registryNamespace={registry?.metadata?.namespace || 'toolhive-system'}
           onDeploy={handleDeploy}
         />
+
+        {/* Manifest Viewer */}
+        {manifest && (
+          <ManifestViewer
+            open={manifestViewerOpen}
+            onClose={() => setManifestViewerOpen(false)}
+            title={manifestTitle}
+            manifest={manifest}
+          />
+        )}
       </Box>
     </Container>
   );

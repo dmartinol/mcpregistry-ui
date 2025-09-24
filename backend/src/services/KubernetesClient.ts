@@ -63,10 +63,10 @@ export interface MCPServer {
   };
   spec: {
     image: string;
-    transport: 'streamable-http' | 'stdio';
+    transport: 'stdio' | 'streamable-http' | 'sse';
     targetPort: number;
     port: number;
-    proxyMode?: 'streaming-http';
+    proxyMode?: 'sse' | 'streamable-http';
     permissionProfile: {
       type: 'builtin';
       name: string;
@@ -98,7 +98,7 @@ export interface MCPServer {
 export interface OrphanedServer {
   name: string;
   namespace: string;
-  transport: 'streamable-http' | 'stdio';
+  transport: 'stdio' | 'streamable-http' | 'sse';
   port: number;
   targetPort: number;
   url?: string;
@@ -597,7 +597,7 @@ export class KubernetesClient {
   async deployMCPServer(serverConfig: {
     name: string;
     image: string;
-    transport: 'streamable-http' | 'stdio';
+    transport: string; // Accept any transport from frontend
     targetPort: number;
     port: number;
     permissionProfile: {
@@ -622,12 +622,16 @@ export class KubernetesClient {
     registryName: string;
     registryNamespace: string;
     serverName: string;
+    proxyMode?: 'sse' | 'streamable-http';
   }): Promise<MCPServer> {
     if (!this.customApi) {
       throw new Error('Kubernetes client not available');
     }
 
     try {
+      // Use the original transport value directly (MCPServer supports stdio, streamable-http, sse)
+      const mcpTransport = serverConfig.transport as 'stdio' | 'streamable-http' | 'sse';
+
       const mcpServer: MCPServer = {
         apiVersion: 'toolhive.stacklok.dev/v1alpha1',
         kind: 'MCPServer',
@@ -643,11 +647,11 @@ export class KubernetesClient {
         },
         spec: {
           image: serverConfig.image,
-          transport: serverConfig.transport,
+          transport: mcpTransport,
           targetPort: serverConfig.targetPort,
           port: serverConfig.port,
-          ...(serverConfig.transport === 'stdio' && {
-            proxyMode: 'streaming-http',
+          ...(serverConfig.proxyMode && {
+            proxyMode: serverConfig.proxyMode,
           }),
           permissionProfile: serverConfig.permissionProfile,
           resources: serverConfig.resources,
@@ -779,6 +783,29 @@ export class KubernetesClient {
     } catch (error) {
       console.error('Error fetching orphaned MCPServers:', error);
       throw new Error('Failed to fetch orphaned MCPServers from Kubernetes');
+    }
+  }
+
+  /**
+   * Get a ConfigMap by name from a namespace
+   */
+  async getConfigMap(name: string, namespace?: string): Promise<any | null> {
+    if (!this.k8sApi) {
+      console.warn('Kubernetes client not available');
+      return null;
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      const response = await this.k8sApi.readNamespacedConfigMap(name, targetNamespace);
+      return response.body;
+    } catch (error) {
+      if ((error as any).statusCode === 404) {
+        return null;
+      }
+      console.error('Error fetching ConfigMap:', error);
+      throw new Error(`Failed to fetch ConfigMap ${name} in namespace ${targetNamespace}`);
     }
   }
 
