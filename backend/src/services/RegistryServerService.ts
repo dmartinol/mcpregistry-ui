@@ -594,4 +594,219 @@ export class RegistryServerService {
       repository_url: data.repository_url,
     };
   }
+
+  /**
+   * Fetches the manifest for a specific server from a registry
+   * For available servers, this returns the raw server data from the registry API
+   * @param registryId The registry identifier
+   * @param serverName The server name
+   * @returns Promise resolving to the raw server data from registry or null if not found
+   */
+  async getServerManifest(registryId: string, serverName: string): Promise<object | null> {
+    try {
+      // For available servers, we want to show the raw registry server data,
+      // not a fake MCPServer manifest. First try to get the raw server data.
+      const serverData = await this.fetchRawServerDataFromRegistry(registryId, serverName);
+
+      if (serverData) {
+        return serverData;
+      }
+
+      // If no raw server data found, return null
+      console.warn(`Server data not found for ${serverName} in registry ${registryId}`);
+      return null;
+
+    } catch (error) {
+      console.warn(`Failed to fetch server data for ${serverName} from registry ${registryId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetches a server manifest from a cluster-internal registry using Kubernetes API proxy
+   * @param registryId The registry identifier
+   * @param clusterUrl The cluster-internal URL
+   * @param serverName The server name
+   * @returns Promise resolving to the server manifest or null if not found
+   */
+  private async fetchServerManifestViaK8sProxy(registryId: string, clusterUrl: string, serverName: string): Promise<object | null> {
+    try {
+      // Import here to avoid circular dependencies
+      const { KubernetesClient } = await import('./KubernetesClient');
+      const k8sClient = new KubernetesClient();
+
+      // Parse the cluster URL to extract service info
+      // Format: http://service-name.namespace.svc.cluster.local:port
+      const urlMatch = clusterUrl.match(/^https?:\/\/([^.]+)\.([^.]+)\.svc\.cluster\.local:?(\d+)?/);
+      if (!urlMatch) {
+        throw new Error(`Invalid cluster URL format: ${clusterUrl}`);
+      }
+
+      const [, serviceName, namespace, port] = urlMatch;
+      const servicePort = port || '8080';
+
+      console.log(`Proxying server manifest to service: ${serviceName} in namespace: ${namespace} on port: ${servicePort}`);
+
+      // Use Kubernetes API to proxy the request to the service
+      const manifest = await k8sClient.proxyServiceRequest(namespace, serviceName, servicePort, `/v0/servers/${serverName}/manifest`);
+      return manifest;
+
+    } catch (error) {
+      console.warn(`Failed to fetch server manifest for ${serverName} via Kubernetes proxy for registry ${registryId}:`, error);
+      if (error instanceof Error && error.message.includes('404')) {
+        return null; // Manifest not found
+      }
+      throw error; // Re-throw to trigger fallback
+    }
+  }
+
+  /**
+   * Fetches raw server data from the registry API without transformation
+   * @param registryId The registry identifier
+   * @param serverName The server name
+   * @returns Promise resolving to raw server data from registry or null if not found
+   */
+  private async fetchRawServerDataFromRegistry(registryId: string, serverName: string): Promise<object | null> {
+    try {
+      // Get registry details to find the URL
+      const registry = await this.getRegistryDetails(registryId);
+
+      if (!registry.url) {
+        console.warn(`Registry ${registryId} has no URL configured, cannot fetch raw server data`);
+        return null;
+      }
+
+      // Check if this is a cluster-internal URL and use Kubernetes API proxy
+      if (registry.url.includes('.svc.cluster.local')) {
+        console.log(`Using Kubernetes API proxy for raw server data from: ${registry.url}`);
+        return await this.fetchRawServerDataViaK8sProxy(registryId, registry.url, serverName);
+      }
+
+      // Try to fetch from the registry's /v0/servers/{name} endpoint directly
+      const registryUrl = registry.url.endsWith('/') ? registry.url.slice(0, -1) : registry.url;
+      const serverEndpoint = `${registryUrl}/v0/servers/${serverName}`;
+
+      console.log(`Fetching raw server data from registry API: ${serverEndpoint}`);
+
+      const response = await fetch(serverEndpoint, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'ToolHive-Registry-UI/1.0.0',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // Server not found
+        }
+        throw new Error(`Registry API returned ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data; // Return raw data without any transformation
+
+    } catch (error) {
+      console.warn(`Failed to fetch raw server data for ${serverName} from registry ${registryId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetches raw server data from a cluster-internal registry using Kubernetes API proxy
+   * @param registryId The registry identifier
+   * @param clusterUrl The cluster-internal URL
+   * @param serverName The server name
+   * @returns Promise resolving to raw server data or null if not found
+   */
+  private async fetchRawServerDataViaK8sProxy(registryId: string, clusterUrl: string, serverName: string): Promise<object | null> {
+    try {
+      // Import here to avoid circular dependencies
+      const { KubernetesClient } = await import('./KubernetesClient');
+      const k8sClient = new KubernetesClient();
+
+      // Parse the cluster URL to extract service info
+      // Format: http://service-name.namespace.svc.cluster.local:port
+      const urlMatch = clusterUrl.match(/^https?:\/\/([^.]+)\.([^.]+)\.svc\.cluster\.local:?(\d+)?/);
+      if (!urlMatch) {
+        throw new Error(`Invalid cluster URL format: ${clusterUrl}`);
+      }
+
+      const [, serviceName, namespace, port] = urlMatch;
+      const servicePort = port || '8080';
+
+      console.log(`Proxying raw server data to service: ${serviceName} in namespace: ${namespace} on port: ${servicePort}`);
+
+      // Use Kubernetes API to proxy the request to the service
+      const data = await k8sClient.proxyServiceRequest(namespace, serviceName, servicePort, `/v0/servers/${serverName}`);
+      return data; // Return raw data without any transformation
+
+    } catch (error) {
+      console.warn(`Failed to fetch raw server data for ${serverName} via Kubernetes proxy for registry ${registryId}:`, error);
+      if (error instanceof Error && error.message.includes('404')) {
+        return null; // Server not found
+      }
+      throw error; // Re-throw to trigger fallback
+    }
+  }
+
+  /**
+   * Generates a fallback manifest for a server when the registry doesn't provide one
+   * @param registryId The registry identifier
+   * @param serverName The server name
+   * @returns A basic server manifest
+   */
+  private async generateFallbackManifest(registryId: string, serverName: string): Promise<object | null> {
+    try {
+      // Try to get basic server info
+      const server = await this.getServerByName(registryId, serverName);
+      if (!server) {
+        return null;
+      }
+
+      // Generate a basic MCPServer manifest based on the server info
+      return {
+        apiVersion: 'toolhive.stacklok.dev/v1alpha1',
+        kind: 'MCPServer',
+        metadata: {
+          name: serverName,
+          namespace: 'default',
+          labels: {
+            'app.kubernetes.io/name': serverName,
+            'app.kubernetes.io/component': 'mcp-server',
+            'toolhive.stacklok.io/registry-name': registryId,
+          },
+        },
+        spec: {
+          image: server.image,
+          transport: server.transport || 'streamable-http',
+          targetPort: 8080,
+          port: 8080,
+          permissionProfile: {
+            type: 'builtin',
+            name: 'default',
+          },
+          resources: {
+            limits: {
+              cpu: '500m',
+              memory: '512Mi',
+            },
+            requests: {
+              cpu: '100m',
+              memory: '128Mi',
+            },
+          },
+          ...(server.env_vars && server.env_vars.length > 0 && {
+            env: server.env_vars.map((envVar: any) => ({
+              name: envVar.name,
+              value: envVar.value || envVar.defaultValue || '',
+            })),
+          }),
+        },
+      };
+    } catch (error) {
+      console.warn(`Failed to generate fallback manifest for ${serverName}:`, error);
+      return null;
+    }
+  }
 }

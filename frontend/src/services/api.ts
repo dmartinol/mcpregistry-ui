@@ -280,6 +280,33 @@ export const api = {
       body: JSON.stringify(request),
     });
   },
+
+  // Manifest operations
+  async getServerManifest(registryId: string, serverName: string): Promise<object> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/registries/${registryId}/servers/${serverName}/manifest`
+    );
+  },
+
+  async getDeployedServerManifest(registryId: string, serverName: string): Promise<object> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/registries/${registryId}/servers/deployed/${serverName}/manifest`
+    );
+  },
+
+  async getOrphanedServerManifest(serverName: string, namespace?: string): Promise<object> {
+    let url = `${API_BASE_URL}/orphaned-servers/${serverName}/manifest`;
+    if (namespace) {
+      url += `?namespace=${encodeURIComponent(namespace)}`;
+    }
+    return fetchWithErrorHandling(url);
+  },
+
+  async getRegistryManifest(registryId: string): Promise<object> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/registries/${registryId}/manifest`
+    );
+  },
 };
 
 export { ApiError };

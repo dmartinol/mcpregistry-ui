@@ -419,4 +419,150 @@ router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res:
   }
 });
 
+// GET /api/v1/registries/:registryId/servers/:serverName/manifest
+router.get('/:registryId/servers/:serverName/manifest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Fetch server manifest from registry API
+    const manifest = await registryServerService.getServerManifest(req.params.registryId, req.params.serverName);
+    if (!manifest) {
+      res.status(404).json({ error: 'Server manifest not found' });
+      return;
+    }
+
+    res.json(manifest);
+  } catch (error) {
+    console.error('Error fetching server manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/registries/:registryId/servers/deployed/:serverName/manifest
+router.get('/:registryId/servers/deployed/:serverName/manifest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Fetch deployed server manifest from Kubernetes
+    const deployedServer = await kubernetesClient.getMCPServer(req.params.serverName);
+    if (!deployedServer) {
+      res.status(404).json({ error: 'Deployed server not found' });
+      return;
+    }
+
+    res.json(deployedServer);
+  } catch (error) {
+    console.error('Error fetching deployed server manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/orphaned-servers
+router.get('/orphaned-servers', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { namespace } = req.query;
+    const orphanedServers = await kubernetesClient.getOrphanedMCPServers(namespace as string);
+    res.json({ servers: orphanedServers });
+  } catch (error) {
+    console.error('Error fetching orphaned servers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/orphaned-servers/:serverName/manifest
+router.get('/orphaned-servers/:serverName/manifest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { namespace } = req.query;
+
+    // Fetch orphaned server manifest from Kubernetes
+    const orphanedServer = await kubernetesClient.getMCPServer(req.params.serverName, namespace as string);
+    if (!orphanedServer) {
+      res.status(404).json({ error: 'Orphaned server not found' });
+      return;
+    }
+
+    res.json(orphanedServer);
+  } catch (error) {
+    console.error('Error fetching orphaned server manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/v1/orphaned-servers/:serverName/connect
+router.post('/orphaned-servers/:serverName/connect', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const connectServerSchema = Joi.object({
+      registryName: Joi.string().required(),
+      registryNamespace: Joi.string().required(),
+      serverNameInRegistry: Joi.string().required(),
+      namespace: Joi.string().optional(),
+    });
+
+    const { error, value } = connectServerSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({
+        error: 'Invalid request parameters',
+        details: error.details.map((d: any) => d.message),
+      });
+      return;
+    }
+
+    // Connect the orphaned server to the registry
+    const connectedServer = await kubernetesClient.connectServerToRegistry(
+      req.params.serverName,
+      value.registryName,
+      value.registryNamespace,
+      value.serverNameInRegistry,
+      value.namespace
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Server connected to registry successfully',
+      server: connectedServer,
+    });
+  } catch (error) {
+    console.error('Error connecting server to registry:', error);
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+// GET /api/v1/registries/:registryId/manifest
+router.get('/:registryId/manifest', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate registry exists
+    const registry = await registryService.getRegistryById(req.params.registryId);
+    if (!registry) {
+      res.status(404).json({ error: 'Registry not found' });
+      return;
+    }
+
+    // Fetch registry manifest from Kubernetes
+    const registryManifest = await kubernetesClient.getMCPRegistry(req.params.registryId);
+    if (!registryManifest) {
+      res.status(404).json({ error: 'Registry manifest not found' });
+      return;
+    }
+
+    res.json(registryManifest);
+  } catch (error) {
+    console.error('Error fetching registry manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export { router as registriesRouter };

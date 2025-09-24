@@ -132,6 +132,27 @@ orphanedServersRouter.post('/:serverId/connect', async (req, res) => {
   }
 });
 
+// GET /api/v1/orphaned-servers/:serverId/manifest
+orphanedServersRouter.get('/:serverId/manifest', async (req, res) => {
+  try {
+    const { serverId } = req.params;
+    const { namespace } = req.query;
+    const targetNamespace = (namespace as string) || 'toolhive-system';
+
+    // Fetch orphaned server manifest from Kubernetes
+    const orphanedServer = await kubernetesClient.getMCPServer(serverId, targetNamespace);
+    if (!orphanedServer) {
+      res.status(404).json({ error: 'Orphaned server not found' });
+      return;
+    }
+
+    res.json(orphanedServer);
+  } catch (error) {
+    console.error('Error fetching orphaned server manifest:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.use('/api/v1/orphaned-servers', orphanedServersRouter);
 
 // Error handling middleware

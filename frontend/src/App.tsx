@@ -42,10 +42,12 @@ import {
   GitHub as GitIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Code as ManifestIcon
 } from '@mui/icons-material';
 import { DeployServerDialog } from './components/DeployServerDialog';
 import { OrphanedServersView } from './components/OrphanedServersView';
+import { ManifestViewer } from './components/ManifestViewer';
 import { api, DeploymentConfig } from './services/api';
 
 export interface Registry {
@@ -144,6 +146,12 @@ const RegistryDashboard: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const navigate = useNavigate();
 
+  // Manifest viewer state
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [manifestTitle, setManifestTitle] = useState('');
+  const [loadingManifest, setLoadingManifest] = useState(false);
+
   useEffect(() => {
     const loadRegistries = async () => {
       try {
@@ -225,6 +233,20 @@ const RegistryDashboard: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleShowRegistryManifest = async (registryId: string) => {
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getRegistryManifest(registryId);
+      setManifest(manifestData);
+      setManifestTitle(`${registryId} Registry`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load registry manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
   };
 
   const getSourceIcon = (type: string) => {
@@ -478,7 +500,27 @@ const RegistryDashboard: React.FC = () => {
                         Updated: {formatDate(registry.updatedAt)}
                       </Typography>
 
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                        <Tooltip title="Show Registry Manifest">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowRegistryManifest(registry.id);
+                            }}
+                            disabled={loadingManifest}
+                            sx={{
+                              color: 'white',
+                              backgroundColor: 'primary.main',
+                              '&:hover': {
+                                backgroundColor: 'primary.dark',
+                                color: 'white',
+                              },
+                            }}
+                          >
+                            <ManifestIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Button
                           size="small"
                           variant="outlined"
@@ -510,6 +552,16 @@ const RegistryDashboard: React.FC = () => {
           />
         </TabPanel>
       </Container>
+
+      {/* Manifest Viewer */}
+      {manifest && (
+        <ManifestViewer
+          open={manifestViewerOpen}
+          onClose={() => setManifestViewerOpen(false)}
+          title={manifestTitle}
+          manifest={manifest}
+        />
+      )}
     </Box>
   );
 };
@@ -542,6 +594,12 @@ const RegistryDetailPage: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<Server | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Manifest viewer state
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [manifestTitle, setManifestTitle] = useState('');
+  const [loadingManifest, setLoadingManifest] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -751,6 +809,34 @@ const RegistryDetailPage: React.FC = () => {
   const handleDeleteCancel = () => {
     setDeleteConfirmOpen(false);
     setServerToDelete(null);
+  };
+
+  const handleShowServerManifest = async (serverName: string) => {
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getServerManifest(registryId!, serverName);
+      setManifest(manifestData);
+      setManifestTitle(`${serverName} Server`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load server manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
+  };
+
+  const handleShowDeployedManifest = async (server: Server) => {
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getDeployedServerManifest(registryId!, server.name);
+      setManifest(manifestData);
+      setManifestTitle(`${server.name} Server`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load deployed server manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
   };
 
   if (loading) {
@@ -1036,16 +1122,38 @@ const RegistryDetailPage: React.FC = () => {
                         </Typography>
                       )}
 
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                        {server.repository && (
-                          <Button
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          {server.repository && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => window.open(server.repository, '_blank')}
+                            >
+                              Repository
+                            </Button>
+                          )}
+                        </Box>
+                        <Tooltip title="Show Manifest">
+                          <IconButton
                             size="small"
-                            variant="outlined"
-                            onClick={() => window.open(server.repository, '_blank')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowServerManifest(server.name);
+                            }}
+                            disabled={loadingManifest}
+                            sx={{
+                              color: 'white',
+                              backgroundColor: 'primary.main',
+                              '&:hover': {
+                                backgroundColor: 'primary.dark',
+                                color: 'white',
+                              },
+                            }}
                           >
-                            Repository
-                          </Button>
-                        )}
+                            <ManifestIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1212,19 +1320,41 @@ const RegistryDetailPage: React.FC = () => {
                             </Button>
                           )}
                         </Box>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setServerToDelete(server);
-                            setDeleteConfirmOpen(true);
-                          }}
-                        >
-                          Delete
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <Tooltip title="Show Manifest">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShowDeployedManifest(server);
+                              }}
+                              disabled={loadingManifest}
+                              sx={{
+                                color: 'white',
+                                backgroundColor: 'primary.main',
+                                '&:hover': {
+                                  backgroundColor: 'primary.dark',
+                                  color: 'white',
+                                },
+                              }}
+                            >
+                              <ManifestIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setServerToDelete(server);
+                              setDeleteConfirmOpen(true);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1629,6 +1759,16 @@ const RegistryDetailPage: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Manifest Viewer */}
+        {manifest && (
+          <ManifestViewer
+            open={manifestViewerOpen}
+            onClose={() => setManifestViewerOpen(false)}
+            title={manifestTitle}
+            manifest={manifest}
+          />
+        )}
       </Container>
     </Box>
   );
