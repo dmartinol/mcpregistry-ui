@@ -11,10 +11,7 @@ import {
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
-  Launch as LaunchIcon,
-  Storage as ServerIcon,
   Schedule as ClockIcon,
-  AccountTree as NamespaceIcon,
   Link as ConnectIcon,
   Code as ManifestIcon,
 } from '@mui/icons-material';

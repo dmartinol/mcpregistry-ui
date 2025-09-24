@@ -292,7 +292,7 @@ const RegistryDashboard: React.FC = () => {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            ToolHive Registry Management
+            MCP Registry
           </Typography>
         </Toolbar>
       </AppBar>
@@ -300,7 +300,7 @@ const RegistryDashboard: React.FC = () => {
       <Container maxWidth="lg" sx={{ mt: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h4" component="h1">
-            ToolHive Management
+            MCP Registry
           </Typography>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Namespace</InputLabel>

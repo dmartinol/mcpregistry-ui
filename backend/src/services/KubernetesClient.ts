@@ -736,6 +736,32 @@ export class KubernetesClient {
   }
 
   /**
+   * Get all MCPServers in a namespace
+   */
+  async getAllMCPServers(namespace?: string): Promise<MCPServer[]> {
+    if (!this.customApi) {
+      console.warn('Kubernetes client not available, returning empty server list');
+      return [];
+    }
+
+    const targetNamespace = namespace || this.namespace;
+
+    try {
+      const response = await this.customApi.listNamespacedCustomObject(
+        'toolhive.stacklok.dev',
+        'v1alpha1',
+        targetNamespace,
+        'mcpservers'
+      );
+
+      return (response.body as any).items || [];
+    } catch (error) {
+      console.error('Error fetching MCPServers:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get orphaned MCPServers (servers without registry labels)
    */
   async getOrphanedMCPServers(namespace?: string): Promise<OrphanedServer[]> {

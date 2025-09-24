@@ -342,48 +342,79 @@ export class RegistryServerService {
    */
   private async fetchDeployedServersFromRegistry(registryId: string, query: RegistryServersQuery): Promise<RegistryServer[]> {
     try {
-      // Get registry details to find the URL
-      const registry = await this.getRegistryDetails(registryId);
+      // Deployed servers are Kubernetes MCPServer resources, not stored in the registry
+      // We need to fetch them directly from Kubernetes API
+      const { KubernetesClient } = await import('./KubernetesClient');
+      const k8sClient = new KubernetesClient();
 
-      if (!registry.url) {
-        console.warn(`Registry ${registryId} has no URL configured, returning empty deployed servers list`);
-        return [];
-      }
+      // For deployed servers, use the same namespace as the registry service
+      // Default to toolhive-system for now
+      const targetNamespace = 'toolhive-system';
 
-      // Check if this is a cluster-internal URL and use Kubernetes API proxy
-      if (registry.url.includes('.svc.cluster.local')) {
-        console.log(`Using Kubernetes API proxy for deployed servers from: ${registry.url}`);
-        return await this.fetchDeployedServersViaK8sProxy(registryId, registry.url, query);
-      }
+      console.log(`Fetching deployed MCPServer resources from namespace: ${targetNamespace}`);
 
-      // Try to fetch from the registry's /v0/servers/deployed endpoint directly
-      const registryUrl = registry.url.endsWith('/') ? registry.url.slice(0, -1) : registry.url;
-      const deployedEndpoint = `${registryUrl}/v0/servers/deployed`;
+      // Fetch all MCPServer resources from the namespace
+      const allMCPServers = await k8sClient.getAllMCPServers(targetNamespace);
 
-      console.log(`Fetching deployed servers from registry API: ${deployedEndpoint}`);
+      // Filter for deployed servers (those that have registry labels - opposite of orphaned)
+      const deployedMCPServers = allMCPServers.filter((server: any) => {
+        const labels = server.metadata?.labels || {};
+        const hasRegistryName = labels['toolhive.stacklok.io/registry-name'];
+        const hasRegistryNamespace = labels['toolhive.stacklok.io/registry-namespace'];
+        const hasServerName = labels['toolhive.stacklok.io/server-name'];
 
-      const response = await fetch(deployedEndpoint, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'ToolHive-Registry-UI/1.0.0',
-        },
+        // Server is deployed if it has all required registry labels
+        return hasRegistryName && hasRegistryNamespace && hasServerName;
       });
 
-      if (!response.ok) {
-        throw new Error(`Registry API returned ${response.status}: ${response.statusText}`);
-      }
+      // Transform MCPServer resources to our RegistryServer format
+      const deployedServers = deployedMCPServers.map((mcpServer: any) => {
+        const spec = mcpServer.spec || {};
+        const status = mcpServer.status || {};
+        const metadata = mcpServer.metadata || {};
 
-      const data = await response.json();
+        return {
+          name: metadata.name || 'unknown',
+          image: spec.image || 'unknown',
+          version: spec.version,
+          description: spec.description || `Deployed MCP server`,
+          tags: ['deployed', ...(spec.tags || [])],
+          capabilities: spec.capabilities || [],
+          author: spec.author,
+          repository: spec.repository,
+          documentation: spec.documentation,
+          tier: spec.tier,
+          transport: spec.transport || 'http',
+          tools: spec.tools || [],
+          tools_count: spec.tools?.length || 0,
+          status: status.phase || 'Unknown',
+          endpoint_url: status.url || this.buildEndpointUrl(metadata.name, targetNamespace, spec.port),
+          ready: status.phase === 'Running',
+          namespace: targetNamespace,
+          env_vars: spec.env || [],
+          metadata: {
+            last_updated: metadata.creationTimestamp,
+            uid: metadata.uid,
+          },
+          repository_url: spec.repository,
+        };
+      });
 
-      // Transform registry response to our format
-      const servers = this.transformRegistryResponse(data);
-      return servers.map(server => this.validateServerData(server));
+      console.log(`Found ${deployedServers.length} deployed servers in namespace ${targetNamespace}`);
+      return deployedServers;
 
     } catch (error) {
       console.warn(`Failed to fetch deployed servers from registry ${registryId}:`, error);
       return []; // Return empty array instead of fallback mock data for deployed servers
     }
+  }
+
+  /**
+   * Build endpoint URL for a deployed MCPServer
+   */
+  private buildEndpointUrl(serverName: string, namespace: string, port?: number): string {
+    const defaultPort = port || 8080;
+    return `http://mcp-${serverName}-proxy.${namespace}.svc.cluster.local:${defaultPort}`;
   }
 
   /**

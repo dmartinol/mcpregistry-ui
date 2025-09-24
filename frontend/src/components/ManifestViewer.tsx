@@ -434,6 +434,17 @@ function convertToYAML(obj: any, indent = 0): string {
   if (typeof obj === 'boolean') return obj.toString();
   if (typeof obj === 'number') return obj.toString();
   if (typeof obj === 'string') {
+    // Use literal block scalar for very long strings or JSON strings
+    if (obj.length > 100 || (obj.startsWith('{') && obj.endsWith('}'))) {
+      const lines = obj.split('\n');
+      if (lines.length === 1) {
+        // Single line but long or JSON - use literal block scalar
+        return `|\n${' '.repeat(indent + 2)}${obj}`;
+      } else {
+        // Multi-line string - use literal block scalar
+        return `|\n${lines.map(line => ' '.repeat(indent + 2) + line).join('\n')}`;
+      }
+    }
     // Quote strings that need quoting
     if (obj.includes('\n') || obj.includes('"') || obj.includes("'") || obj.includes(':') || obj.includes('[') || obj.includes(']') || obj.includes('{') || obj.includes('}')) {
       return `"${obj.replace(/"/g, '\\"')}"`;
