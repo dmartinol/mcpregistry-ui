@@ -360,15 +360,9 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 // POST /api/v1/registries/:registryId/servers/:serverName/deploy
 router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('=== DEPLOY SERVER REQUEST ===');
-    console.log('Registry ID:', req.params.registryId);
-    console.log('Server Name:', req.params.serverName);
-    console.log('Request Body:', JSON.stringify(req.body, null, 2));
-
     // Validate registry exists
     const registry = await registryService.getRegistryById(req.params.registryId);
     if (!registry) {
-      console.log('Registry not found');
       res.status(404).json({ error: 'Registry not found' });
       return;
     }
@@ -376,7 +370,6 @@ router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res:
     // Validate server exists
     const server = await registryServerService.getServerByName(req.params.registryId, req.params.serverName);
     if (!server) {
-      console.log('Server not found');
       res.status(404).json({ error: 'Server not found' });
       return;
     }
@@ -384,14 +377,12 @@ router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res:
     // Validate deployment configuration
     const { error, value } = deployServerSchema.validate(req.body);
     if (error) {
-      console.log('Validation error:', error.details);
       res.status(400).json({
         error: 'Invalid deployment configuration',
         details: error.details.map((d: any) => d.message),
       });
       return;
     }
-    console.log('Validation passed, validated config:', JSON.stringify(value, null, 2));
 
     // Check if a server with the same name already exists
     const existingServer = await kubernetesClient.getMCPServer(value.name, value.namespace);
