@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -15,7 +15,9 @@ import {
   Person as PersonIcon,
   Image as ImageIcon,
   PlayArrow as DeployIcon,
+  Code as ManifestIcon,
 } from '@mui/icons-material';
+import { ManifestViewer } from './ManifestViewer';
 
 interface RegistryServer {
   name: string;
@@ -33,9 +35,21 @@ interface ServerCardProps {
   server: RegistryServer;
   onClick?: () => void;
   onDeploy?: () => void;
+  onShowManifest?: () => Promise<object>;
 }
 
-export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeploy }) => {
+export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeploy, onShowManifest }) => {
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [loadingManifest, setLoadingManifest] = useState(false);
+
+  console.log('🚨 ServerCard DEBUG:', server.name, 'onShowManifest:', !!onShowManifest);
+  console.log('🚨 ServerCard has manifest callback:', typeof onShowManifest === 'function');
+
+  // Add alert for debugging
+  if (onShowManifest) {
+    console.log('🚨 MANIFEST CALLBACK EXISTS - BUTTON SHOULD BE VISIBLE!');
+  }
   const handleLinkClick = (event: React.MouseEvent, url: string) => {
     event.stopPropagation();
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -44,6 +58,22 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
   const handleDeployClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     onDeploy?.();
+  };
+
+  const handleManifestClick = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!onShowManifest) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await onShowManifest();
+      setManifest(manifestData);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
   };
 
   const getTagColor = (tag: string): 'primary' | 'secondary' | 'success' | 'warning' | 'info' => {
@@ -197,64 +227,89 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
         )}
       </CardContent>
 
-      {/* Footer with Action Links */}
-      {(server.repository || server.documentation || onDeploy) && (
-        <Box
-          sx={{
-            px: 2,
-            pb: 2,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 1,
-            borderTop: 1,
-            borderColor: 'divider',
-            pt: 1,
-          }}
-        >
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {server.repository && (
-              <Tooltip title="View Repository">
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleLinkClick(e, server.repository!)}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  <GitHubIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {server.documentation && (
-              <Tooltip title="View Documentation">
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleLinkClick(e, server.documentation!)}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  <DocsIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-          {onDeploy && (
-            <Tooltip title="Deploy Server">
+      {/* Action buttons footer */}
+      <Box
+        sx={{
+          px: 2,
+          pb: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 1,
+          borderTop: 1,
+          borderColor: 'divider',
+          pt: 1,
+        }}
+      >
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {server.repository && (
+            <Tooltip title="View Repository">
               <IconButton
                 size="small"
-                onClick={handleDeployClick}
+                onClick={(e) => handleLinkClick(e, server.repository!)}
+                sx={{ color: 'text.secondary' }}
+              >
+                <GitHubIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {server.documentation && (
+            <Tooltip title="View Documentation">
+              <IconButton
+                size="small"
+                onClick={(e) => handleLinkClick(e, server.documentation!)}
+                sx={{ color: 'text.secondary' }}
+              >
+                <DocsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {onShowManifest && (
+            <Tooltip title="Show Manifest">
+              <IconButton
+                size="small"
+                onClick={handleManifestClick}
+                disabled={loadingManifest}
                 sx={{
                   color: 'primary.main',
-                  backgroundColor: 'primary.light',
                   '&:hover': {
-                    backgroundColor: 'primary.main',
-                    color: 'white',
+                    backgroundColor: 'primary.light',
                   },
                 }}
               >
-                <DeployIcon fontSize="small" />
+                <ManifestIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
         </Box>
+        {onDeploy && (
+          <Tooltip title="Deploy Server">
+            <IconButton
+              size="small"
+              onClick={handleDeployClick}
+              sx={{
+                color: 'primary.main',
+                backgroundColor: 'primary.light',
+                '&:hover': {
+                  backgroundColor: 'primary.main',
+                  color: 'white',
+                },
+              }}
+            >
+              <DeployIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+
+      {/* Manifest Viewer */}
+      {manifest && (
+        <ManifestViewer
+          open={manifestViewerOpen}
+          onClose={() => setManifestViewerOpen(false)}
+          title={`${server.name} Server`}
+          manifest={manifest}
+        />
       )}
     </Card>
   );

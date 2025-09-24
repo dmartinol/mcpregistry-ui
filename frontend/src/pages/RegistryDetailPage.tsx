@@ -186,6 +186,28 @@ export const RegistryDetailPage: React.FC = () => {
     }
   };
 
+  const handleShowServerManifest = async (serverName: string) => {
+    if (!registryId) return {};
+
+    try {
+      return await api.getServerManifest(registryId, serverName);
+    } catch (error) {
+      console.error('Failed to fetch server manifest:', error);
+      throw error;
+    }
+  };
+
+  const handleShowDeployedServerManifest = async (serverName: string) => {
+    if (!registryId) return {};
+
+    try {
+      return await api.getDeployedServerManifest(registryId, serverName);
+    } catch (error) {
+      console.error('Failed to fetch deployed server manifest:', error);
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -286,6 +308,7 @@ export const RegistryDetailPage: React.FC = () => {
                     key={server.name}
                     server={server}
                     onDeploy={() => handleDeployServer(server)}
+                    onShowManifest={() => handleShowServerManifest(server.name)}
                   />
                 ))}
               </Box>
@@ -306,6 +329,7 @@ export const RegistryDetailPage: React.FC = () => {
                   <DeployedServerCard
                     key={server.id}
                     server={server}
+                    onShowManifest={() => handleShowDeployedServerManifest(server.name)}
                   />
                 ))}
               </Box>

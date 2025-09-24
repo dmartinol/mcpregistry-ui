@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -16,7 +16,9 @@ import {
   Schedule as ClockIcon,
   AccountTree as NamespaceIcon,
   Link as ConnectIcon,
+  Code as ManifestIcon,
 } from '@mui/icons-material';
+import { ManifestViewer } from './ManifestViewer';
 
 export interface OrphanedServer {
   name: string;
@@ -35,13 +37,18 @@ interface OrphanedServerCardProps {
   server: OrphanedServer;
   onConnect: (server: OrphanedServer) => void;
   onClick?: () => void;
+  onShowManifest?: () => Promise<object>;
 }
 
 export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
   server,
   onConnect,
-  onClick
+  onClick,
+  onShowManifest
 }) => {
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [loadingManifest, setLoadingManifest] = useState(false);
   const getStatusColor = (status: string): 'success' | 'warning' | 'error' | 'info' => {
     switch (status) {
       case 'Running':
@@ -62,6 +69,22 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
       await navigator.clipboard.writeText(text);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
+    }
+  };
+
+  const handleManifestClick = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!onShowManifest) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await onShowManifest();
+      setManifest(manifestData);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load manifest:', error);
+    } finally {
+      setLoadingManifest(false);
     }
   };
 
@@ -248,6 +271,26 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
                   <LaunchIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+              {onShowManifest && (
+                <Tooltip title="Show Manifest">
+                  <IconButton
+                    size="small"
+                    onClick={handleManifestClick}
+                    disabled={loadingManifest}
+                    aria-label="show manifest"
+                    sx={{
+                      color: 'white',
+                      backgroundColor: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <ManifestIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           </Box>
         )}
@@ -268,6 +311,30 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
           </Box>
         </Box>
 
+        {/* Actions section for manifest when no URL */}
+        {!server.url && onShowManifest && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Tooltip title="Show Manifest">
+              <IconButton
+                size="small"
+                onClick={handleManifestClick}
+                disabled={loadingManifest}
+                aria-label="show manifest"
+                sx={{
+                  color: 'white',
+                  backgroundColor: 'primary.main',
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white',
+                  },
+                }}
+              >
+                <ManifestIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
+
         {/* Register with Registry Button */}
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 'auto' }}>
           <Button
@@ -284,6 +351,16 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
           </Button>
         </Box>
       </CardContent>
+
+      {/* Manifest Viewer */}
+      {manifest && (
+        <ManifestViewer
+          open={manifestViewerOpen}
+          onClose={() => setManifestViewerOpen(false)}
+          title={`${server.name} Server`}
+          manifest={manifest}
+        />
+      )}
     </Card>
   );
 };

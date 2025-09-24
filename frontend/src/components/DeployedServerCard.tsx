@@ -18,7 +18,9 @@ import {
   Storage as ServerIcon,
   Schedule as ClockIcon,
   AccountTree as NamespaceIcon,
+  Code as ManifestIcon,
 } from '@mui/icons-material';
+import { ManifestViewer } from './ManifestViewer';
 
 type ServerStatus = 'Pending' | 'Running' | 'Failed' | 'Terminating';
 
@@ -39,9 +41,10 @@ interface DeployedServer {
 interface DeployedServerCardProps {
   server: DeployedServer;
   onClick?: () => void;
+  onShowManifest?: () => Promise<object>;
 }
 
-export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, onClick }) => {
+export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, onClick, onShowManifest }) => {
   const [copySnackbar, setCopySnackbar] = useState<{
     open: boolean;
     message: string;
@@ -51,6 +54,10 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
     message: '',
     severity: 'success',
   });
+
+  const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
+  const [manifest, setManifest] = useState<object | null>(null);
+  const [loadingManifest, setLoadingManifest] = useState(false);
 
   const getStatusColor = (status: ServerStatus): 'success' | 'warning' | 'error' | 'info' => {
     switch (status) {
@@ -122,6 +129,22 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
 
   const handleSnackbarClose = () => {
     setCopySnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const handleManifestClick = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!onShowManifest) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await onShowManifest();
+      setManifest(manifestData);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
   };
 
 
@@ -282,12 +305,25 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
                     <LaunchIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
+                {onShowManifest && (
+                  <Tooltip title="Show Manifest">
+                    <IconButton
+                      size="small"
+                      onClick={handleManifestClick}
+                      disabled={loadingManifest}
+                      aria-label="show manifest"
+                      sx={{ color: 'primary.main' }}
+                    >
+                      <ManifestIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Box>
             </Box>
           )}
 
           {/* Metadata */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: onShowManifest ? 2 : 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <NamespaceIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
               <Typography variant="caption" color="text.secondary">
@@ -309,6 +345,29 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
               </Box>
             )}
           </Box>
+
+          {/* Actions */}
+          {onShowManifest && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 'auto' }}>
+              <Tooltip title="Show Manifest">
+                <IconButton
+                  onClick={handleManifestClick}
+                  disabled={loadingManifest}
+                  aria-label="show manifest"
+                  sx={{
+                    color: 'primary.main',
+                    backgroundColor: 'primary.light',
+                    '&:hover': {
+                      backgroundColor: 'primary.main',
+                      color: 'white',
+                    },
+                  }}
+                >
+                  <ManifestIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
@@ -328,6 +387,16 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
           {copySnackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Manifest Viewer */}
+      {manifest && (
+        <ManifestViewer
+          open={manifestViewerOpen}
+          onClose={() => setManifestViewerOpen(false)}
+          title={`${server.id} Server`}
+          manifest={manifest}
+        />
+      )}
     </>
   );
 };

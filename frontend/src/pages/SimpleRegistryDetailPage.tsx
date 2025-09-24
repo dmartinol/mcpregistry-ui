@@ -13,8 +13,8 @@ import {
   Paper,
 } from '@mui/material';
 import { Home as HomeIcon } from '@mui/icons-material';
-// import { ServerCard } from '../components/ServerCard';
-// import { DeployedServerCard } from '../components/DeployedServerCard';
+import { ServerCard } from '../components/ServerCard';
+import { DeployedServerCard } from '../components/DeployedServerCard';
 import { api } from '../services/api';
 
 interface TabPanelProps {
@@ -110,6 +110,68 @@ export const SimpleRegistryDetailPage: React.FC = () => {
 
   const handleBreadcrumbClick = () => {
     navigate('/');
+  };
+
+  const handleShowServerManifest = async (serverName: string) => {
+    try {
+      const manifestData = await api.getServerManifest(registryId!, serverName);
+      return manifestData;
+    } catch (error) {
+      console.error('Failed to load server manifest:', error);
+      throw error;
+    }
+  };
+
+  const handleShowDeployedManifest = async (server: any) => {
+    try {
+      const manifestData = await api.getDeployedServerManifest(registryId!, server.name || server.id);
+      return manifestData;
+    } catch (error) {
+      console.error('Failed to load deployed server manifest:', error);
+      throw error;
+    }
+  };
+
+  const handleDeployServer = async (server: any) => {
+    try {
+      const config = {
+        name: server.name,
+        image: server.image,
+        transport: 'streamable-http' as const,
+        targetPort: 8080,
+        port: 8080,
+        permissionProfile: {
+          type: 'builtin' as const,
+          name: 'default'
+        },
+        resources: {
+          limits: {
+            cpu: '100m',
+            memory: '128Mi'
+          },
+          requests: {
+            cpu: '50m',
+            memory: '64Mi'
+          }
+        },
+        environmentVariables: [],
+        namespace: 'default',
+        registryName: registry?.name || 'unknown',
+        registryNamespace: 'default'
+      };
+      await api.deployServer(registryId!, server.name, config);
+      // Reload deployed servers
+      setDeployedLoading(true);
+      try {
+        const deployedData = await api.getDeployedServers(registryId!);
+        setDeployedServers(deployedData.servers);
+      } catch (err) {
+        console.warn('Failed to reload deployed servers:', err);
+      }
+      setDeployedLoading(false);
+    } catch (error) {
+      console.error('Failed to deploy server:', error);
+    }
   };
 
   if (loading) {
@@ -208,30 +270,12 @@ export const SimpleRegistryDetailPage: React.FC = () => {
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
                 {availableServers.map((server) => (
-                  <Paper key={server.name} sx={{ p: 2 }}>
-                    <Typography variant="h6">{server.name}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                      {server.image}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      {server.description}
-                    </Typography>
-                    {server.tags && server.tags.length > 0 && (
-                      <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {server.tags.map((tag: string) => (
-                          <Typography key={tag} variant="caption" sx={{
-                            bgcolor: 'primary.main',
-                            color: 'white',
-                            px: 1,
-                            py: 0.5,
-                            borderRadius: 1
-                          }}>
-                            {tag}
-                          </Typography>
-                        ))}
-                      </Box>
-                    )}
-                  </Paper>
+                  <ServerCard
+                    key={server.name}
+                    server={server}
+                    onDeploy={() => handleDeployServer(server)}
+                    onShowManifest={() => handleShowServerManifest(server.name)}
+                  />
                 ))}
               </Box>
             )}
@@ -248,17 +292,11 @@ export const SimpleRegistryDetailPage: React.FC = () => {
             ) : (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
                 {deployedServers.map((server) => (
-                  <Paper key={server.id} sx={{ p: 2 }}>
-                    <Typography variant="h6">{server.name || server.id}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Status: {server.status}
-                    </Typography>
-                    {server.endpoint && (
-                      <Typography variant="body2" sx={{ mt: 1, fontFamily: 'monospace' }}>
-                        {server.endpoint}
-                      </Typography>
-                    )}
-                  </Paper>
+                  <DeployedServerCard
+                    key={server.id}
+                    server={server}
+                    onShowManifest={() => handleShowDeployedManifest(server)}
+                  />
                 ))}
               </Box>
             )}

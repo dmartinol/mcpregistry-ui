@@ -97,6 +97,15 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
     }
   };
 
+  const handleShowOrphanedServerManifest = async (serverName: string, namespace: string) => {
+    try {
+      return await api.getOrphanedServerManifest(serverName, namespace);
+    } catch (error) {
+      console.error('Failed to fetch orphaned server manifest:', error);
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -159,6 +168,7 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
               <OrphanedServerCard
                 server={server}
                 onConnect={handleConnectToRegistry}
+                onShowManifest={() => handleShowOrphanedServerManifest(server.name, server.namespace)}
               />
             </Grid>
           ))}
