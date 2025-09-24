@@ -21,6 +21,15 @@ export interface Registry {
     location: string;
     syncInterval?: string;
   };
+  // Sync status information
+  syncStatus?: {
+    lastAttempt?: Date;
+    lastSyncHash?: string;
+    lastSyncTime?: Date;
+    message?: string;
+    phase?: 'Idle' | 'Syncing' | 'Error' | 'Pending';
+    serverCount?: number;
+  };
 }
 
 export interface CreateRegistryRequest {

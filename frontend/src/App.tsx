@@ -71,6 +71,14 @@ export interface Registry {
     location: string;
     syncInterval?: string;
   };
+  syncStatus?: {
+    lastAttempt?: string;
+    lastSyncHash?: string;
+    lastSyncTime?: string;
+    message?: string;
+    phase?: 'Idle' | 'Syncing' | 'Error' | 'Pending';
+    serverCount?: number;
+  };
 }
 
 
@@ -292,7 +300,7 @@ const RegistryDashboard: React.FC = () => {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            MCP Registry
+            🧪 MCP Registry (Experimental) ⚠️
           </Typography>
         </Toolbar>
       </AppBar>
@@ -664,6 +672,41 @@ const RegistryDetailPage: React.FC = () => {
     }
   };
 
+  const handleShowRegistryManifest = async () => {
+    if (!registryId) return;
+
+    setLoadingManifest(true);
+    try {
+      const manifestData = await api.getRegistryManifest(registryId);
+      setManifest(manifestData);
+      setManifestTitle(`${registryId} Registry`);
+      setManifestViewerOpen(true);
+    } catch (error) {
+      console.error('Failed to load registry manifest:', error);
+    } finally {
+      setLoadingManifest(false);
+    }
+  };
+
+  const handleForceSync = async (event: React.MouseEvent) => {
+    if (!registryId) return;
+
+    event.stopPropagation();
+    try {
+      const response = await fetch(`/api/v1/registries/${registryId}/force-sync`, { method: 'POST' });
+      if (response.ok) {
+        console.log('Force sync initiated for registry:', registryId);
+        // Refresh the data to show updated status
+        await loadData(true);
+      } else {
+        const error = await response.json();
+        console.error('Force sync failed:', error);
+      }
+    } catch (err) {
+      console.error('Error triggering force sync:', err);
+    }
+  };
+
   const loadData = async (isRefresh = false) => {
     if (!registryId) {
       setError('Registry ID is required');
@@ -979,18 +1022,48 @@ const RegistryDetailPage: React.FC = () => {
 
             <Paper elevation={2} sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h4" component="h1">
-                  {registry.name}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={handleRefresh}
-                  size="small"
-                  disabled={refreshing}
-                >
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
-                </Button>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h4" component="h1">
+                    {registry.name}
+                  </Typography>
+                  <Tooltip title="View registry manifest">
+                    <IconButton
+                      size="small"
+                      onClick={handleShowRegistryManifest}
+                      disabled={loadingManifest}
+                      sx={{
+                        color: 'white',
+                        backgroundColor: 'primary.main',
+                        '&:hover': {
+                          backgroundColor: 'primary.dark',
+                          color: 'white',
+                        },
+                      }}
+                    >
+                      <ManifestIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<SyncIcon />}
+                    onClick={handleForceSync}
+                    size="small"
+                    disabled={registry.status === 'syncing'}
+                  >
+                    Force Sync
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleRefresh}
+                    size="small"
+                    disabled={refreshing}
+                  >
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </Box>
               </Box>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                 <Typography variant="body2">
@@ -1007,46 +1080,68 @@ const RegistryDetailPage: React.FC = () => {
                 </Typography>
               </Box>
 
-              {/* Source and Sync Policy Information */}
-              {(registry.source || registry.lastSyncAt) && (
+              {/* Source Information */}
+              {registry.source && (
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {registry.source && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2">
-                        <strong>{registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}:</strong>
-                      </Typography>
-                      <Typography variant="body2">
-                        {registry.source.location}
-                      </Typography>
-                      {(registry.source.type === 'configmap' || registry.source.type === 'git') && (
-                        <LaunchIcon
-                          fontSize="small"
-                          sx={{
-                            cursor: 'pointer',
-                            '&:hover': {
-                              color: 'primary.dark',
-                            },
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSourceClick(registry);
-                          }}
-                        />
-                      )}
-                    </Box>
-                  )}
-                  {registry.source?.syncInterval && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="body2">
-                      <strong>Sync Policy:</strong> {registry.source.syncInterval === 'manual' ? 'Manual' : `Automatic (${registry.source.syncInterval})`}
+                      <strong>{registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}:</strong>
                     </Typography>
-                  )}
-                  {registry.lastSyncAt && (
                     <Typography variant="body2">
-                      <strong>Last Sync:</strong> {new Date(registry.lastSyncAt).toLocaleString()}
+                      {registry.source.location}
                     </Typography>
-                  )}
+                    {(registry.source.type === 'configmap' || registry.source.type === 'git') && (
+                      <LaunchIcon
+                        fontSize="small"
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': {
+                            color: 'primary.dark',
+                          },
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSourceClick(registry);
+                        }}
+                      />
+                    )}
+                  </Box>
                 </Box>
               )}
+
+              {/* Sync Status Information */}
+              {(() => {
+                console.log(`🔍 [FRONTEND DEBUG] Registry ${registry.name} syncStatus:`, registry.syncStatus);
+                return (registry.syncStatus || registry.source?.syncInterval || registry.lastSyncAt) && (
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mt: 1 }}>
+                    {registry.source?.syncInterval && (
+                      <Typography variant="body2">
+                        <strong>Sync Policy:</strong> {registry.source.syncInterval === 'manual' ? 'Manual' : `Automatic (${registry.source.syncInterval})`}
+                      </Typography>
+                    )}
+                    {registry.syncStatus?.phase && (
+                      <Typography variant="body2">
+                        <strong>Sync Status:</strong> {registry.syncStatus.phase}
+                      </Typography>
+                    )}
+                    {registry.syncStatus?.message && (
+                      <Typography variant="body2">
+                        <strong>Message:</strong> {registry.syncStatus.message}
+                      </Typography>
+                    )}
+                    {registry.syncStatus?.lastSyncTime && (
+                      <Typography variant="body2">
+                        <strong>Last Sync:</strong> {new Date(registry.syncStatus.lastSyncTime).toLocaleString()}
+                      </Typography>
+                    )}
+                    {!registry.syncStatus?.lastSyncTime && registry.lastSyncAt && (
+                      <Typography variant="body2">
+                        <strong>Last Sync:</strong> {new Date(registry.lastSyncAt).toLocaleString()}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })()}
             </Paper>
           </Box>
         </Container>

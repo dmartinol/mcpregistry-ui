@@ -45,6 +45,14 @@ export interface MCPRegistry {
     servers?: number;
     lastSync?: string;
     message?: string;
+    syncStatus?: {
+      lastAttempt?: string;
+      lastSyncHash?: string;
+      lastSyncTime?: string;
+      message?: string;
+      phase?: 'Idle' | 'Syncing' | 'Error' | 'Pending';
+      serverCount?: number;
+    };
     [key: string]: any;
   };
 }
@@ -349,16 +357,19 @@ export class KubernetesClient {
   // Helper method to convert MCPRegistry to our Registry model
   async mcpRegistryToRegistry(mcpRegistry: MCPRegistry): Promise<Registry> {
     const status = this.mapMCPPhaseToStatus(mcpRegistry.status?.phase);
-    const actualServerCount = await this.getActualServerCount(mcpRegistry);
     const sourceInfo = this.extractSourceInfo(mcpRegistry);
+    const syncStatus = this.extractSyncStatus(mcpRegistry);
 
-    return {
+    // Use server count from syncStatus if available, otherwise fall back to API call
+    const serverCount = syncStatus?.serverCount ?? await this.getActualServerCount(mcpRegistry);
+
+    const result = {
       id: mcpRegistry.metadata.name,
       name: mcpRegistry.metadata.name,
       url: (mcpRegistry.status as any)?.apiEndpoint || mcpRegistry.spec.url || '',
       description: mcpRegistry.spec.description,
       status,
-      serverCount: actualServerCount,
+      serverCount,
       lastSyncAt: mcpRegistry.status?.lastSync ? new Date(mcpRegistry.status.lastSync) : undefined,
       createdAt: new Date(mcpRegistry.metadata.creationTimestamp),
       updatedAt: new Date(mcpRegistry.metadata.creationTimestamp),
@@ -371,7 +382,10 @@ export class KubernetesClient {
         { ...mcpRegistry.spec.auth, type: mcpRegistry.spec.auth.type as 'none' | 'basic' | 'bearer' | 'oauth' } :
         { type: 'none' as const },
       source: sourceInfo,
+      syncStatus,
     };
+
+    return result;
   }
 
   // Helper method to get actual server count from registry API
@@ -503,6 +517,25 @@ export class KubernetesClient {
       console.error('Error making Kubernetes proxy request:', error);
       throw new Error(`Failed to proxy request to service ${serviceName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Extract sync status information from MCPRegistry status
+   */
+  private extractSyncStatus(mcpRegistry: MCPRegistry): Registry['syncStatus'] | undefined {
+    const syncStatus = mcpRegistry.status?.syncStatus;
+    if (!syncStatus) {
+      return undefined;
+    }
+
+    return {
+      lastAttempt: syncStatus.lastAttempt ? new Date(syncStatus.lastAttempt) : undefined,
+      lastSyncHash: syncStatus.lastSyncHash,
+      lastSyncTime: syncStatus.lastSyncTime ? new Date(syncStatus.lastSyncTime) : undefined,
+      message: syncStatus.message,
+      phase: syncStatus.phase,
+      serverCount: syncStatus.serverCount,
+    };
   }
 
   /**

@@ -11,8 +11,14 @@ import {
   Alert,
   Container,
   Paper,
+  Button,
+  Tooltip,
 } from '@mui/material';
-import { Home as HomeIcon, Launch as LaunchIcon } from '@mui/icons-material';
+import {
+  Home as HomeIcon,
+  Launch as LaunchIcon,
+  Sync as SyncIcon,
+} from '@mui/icons-material';
 import { ServerCard } from '../components/ServerCard';
 import { DeployedServerCard } from '../components/DeployedServerCard';
 import { DeployServerDialog } from '../components/DeployServerDialog';
@@ -117,6 +123,41 @@ export const RegistryDetailPage: React.FC = () => {
   const [manifest, setManifest] = useState<object | null>(null);
   const [manifestTitle, setManifestTitle] = useState('');
   const [, setLoadingManifest] = useState(false);
+
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Force sync function
+  const handleForceSync = async () => {
+    if (!registryId || isSyncing) return;
+
+    try {
+      setIsSyncing(true);
+      const response = await fetch(`/api/v1/registries/${registryId}/force-sync`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        console.log('Force sync initiated for registry:', registryId);
+        // Refresh the registry data after a short delay to show updated status
+        setTimeout(async () => {
+          try {
+            const registryData = await api.getRegistryDetails(registryId);
+            setRegistry(registryData);
+          } catch (err) {
+            console.warn('Failed to refresh registry after sync:', err);
+          }
+        }, 2000);
+      } else {
+        const error = await response.json();
+        console.error('Force sync failed:', error);
+      }
+    } catch (err) {
+      console.error('Error triggering force sync:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const loadRegistryDetails = async () => {
@@ -351,9 +392,23 @@ export const RegistryDetailPage: React.FC = () => {
 
         {/* Registry Header */}
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            {registry.name}
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+            <Typography variant="h4" component="h1">
+              {registry.name}
+            </Typography>
+            <Tooltip title="Force sync registry to fetch latest servers">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<SyncIcon />}
+                onClick={handleForceSync}
+                disabled={isSyncing || registry.status === 'syncing'}
+                sx={{ ml: 2, flexShrink: 0 }}
+              >
+                {isSyncing ? 'Syncing...' : 'Force Sync'}
+              </Button>
+            </Tooltip>
+          </Box>
 
           {registry.description && (
             <Typography variant="body1" color="text.secondary" paragraph>
