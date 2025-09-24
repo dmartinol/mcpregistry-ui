@@ -736,6 +736,19 @@ export class KubernetesClient {
   }
 
   /**
+   * Read a ConfigMap from Kubernetes
+   */
+  async readConfigMap(name: string, namespace?: string): Promise<any> {
+    if (!this.k8sApi) {
+      throw new Error('Kubernetes client not available');
+    }
+
+    const targetNamespace = namespace || this.namespace;
+    const response = await this.k8sApi.readNamespacedConfigMap(name, targetNamespace);
+    return response.body;
+  }
+
+  /**
    * Get all MCPServers in a namespace
    */
   async getAllMCPServers(namespace?: string): Promise<MCPServer[]> {

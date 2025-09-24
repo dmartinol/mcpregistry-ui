@@ -80,8 +80,9 @@ export class RegistryServerService {
       const registry = await this.getRegistryDetails(registryId);
 
       if (!registry.url) {
-        console.warn(`Registry ${registryId} has no URL configured, using mock data`);
-        return this.getMockServers();
+        console.log(`Registry ${registryId} has no URL, checking for ConfigMap source data`);
+        // Try to fetch from ConfigMap storage
+        return await this.fetchServersFromConfigMap(registryId);
       }
 
       // Check if this is a cluster-internal URL and use Kubernetes API proxy
@@ -179,12 +180,17 @@ export class RegistryServerService {
       throw new Error(`Registry ${registryId} not found`);
     }
 
-    // Use the apiEndpoint from the status section, not the url field
-    const apiEndpoint = (registry as any).status?.apiEndpoint;
+    // Check for API endpoint in multiple possible locations
+    const apiEndpoint = (registry as any).status?.apiStatus?.endpoint ||
+                       (registry as any).status?.apiEndpoint ||
+                       (registry as any).spec?.url;
+
     if (!apiEndpoint) {
-      throw new Error(`Registry ${registryId} has no apiEndpoint in status`);
+      console.log(`Registry ${registryId} has no API endpoint, using ConfigMap-based data`);
+      return { url: '' }; // Empty URL will trigger ConfigMap fetching
     }
 
+    console.log(`Registry ${registryId} has API endpoint: ${apiEndpoint}`);
     return { url: apiEndpoint };
   }
 
@@ -407,6 +413,76 @@ export class RegistryServerService {
       console.warn(`Failed to fetch deployed servers from registry ${registryId}:`, error);
       return []; // Return empty array instead of fallback mock data for deployed servers
     }
+  }
+
+  /**
+   * Fetch servers from ConfigMap storage (for Git/ConfigMap based registries)
+   */
+  private async fetchServersFromConfigMap(registryId: string): Promise<RegistryServer[]> {
+    try {
+      const { KubernetesClient } = await import('./KubernetesClient');
+      const k8sClient = new KubernetesClient();
+
+      // ConfigMap name pattern: {registryId}-registry-storage
+      const configMapName = `${registryId}-registry-storage`;
+      const namespace = 'toolhive-system';
+
+      console.log(`Fetching servers from ConfigMap: ${configMapName} in namespace: ${namespace}`);
+
+      const configMap = await k8sClient.readConfigMap(configMapName, namespace);
+      const configMapData = configMap.data;
+
+      if (!configMapData || !configMapData['registry.json']) {
+        console.warn(`No registry.json found in ConfigMap ${configMapName}, using mock data`);
+        return this.getMockServers();
+      }
+
+      const registryData = JSON.parse(configMapData['registry.json']);
+      console.log(`Found ${Object.keys(registryData.servers || {}).length} servers in ConfigMap`);
+
+      // Transform the registry data to our format
+      const servers: RegistryServer[] = [];
+      if (registryData.servers) {
+        for (const [serverName, serverData] of Object.entries(registryData.servers)) {
+          const server = this.transformConfigMapServerData(serverName, serverData as any);
+          servers.push(server);
+        }
+      }
+
+      return servers;
+    } catch (error) {
+      console.warn(`Failed to fetch from ConfigMap for registry ${registryId}:`, error);
+      console.log('Falling back to mock data');
+      return this.getMockServers();
+    }
+  }
+
+  /**
+   * Transform server data from ConfigMap format to our RegistryServer format
+   */
+  private transformConfigMapServerData(serverName: string, serverData: any): RegistryServer {
+    return {
+      name: serverName,
+      image: serverData.image || `${serverName}:latest`,
+      version: serverData.version,
+      description: serverData.description || `${serverName} server`,
+      tags: serverData.tags || [],
+      capabilities: serverData.capabilities || [],
+      author: serverData.author,
+      repository: serverData.repository_url,
+      documentation: serverData.documentation,
+      tier: serverData.tier,
+      transport: serverData.transport || 'stdio',
+      tools: serverData.tools || [],
+      tools_count: serverData.tools?.length || 0,
+      status: serverData.status,
+      endpoint_url: serverData.endpoint_url,
+      ready: serverData.status === 'Active',
+      namespace: undefined,
+      env_vars: serverData.env_vars || [],
+      metadata: serverData.metadata,
+      repository_url: serverData.repository_url,
+    };
   }
 
   /**
