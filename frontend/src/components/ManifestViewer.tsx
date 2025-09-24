@@ -56,7 +56,7 @@ const CodeEditor = styled('div')(({ theme }) => ({
   position: 'relative',
 }));
 
-const CodeLine = styled('div')<{ indent: number; foldable: boolean; folded: boolean }>(({ theme, indent, foldable, folded }) => ({
+const CodeLine = styled('div')<{ indent: number; foldable: boolean; folded: boolean }>(({ theme, foldable, folded }) => ({
   display: folded ? 'none' : 'flex',
   alignItems: 'center',
   position: 'relative',
@@ -443,7 +443,7 @@ function convertToYAML(obj: any, indent = 0): string {
 
   if (Array.isArray(obj)) {
     if (obj.length === 0) return '[]';
-    return obj.map((item, index) => {
+    return obj.map((item) => {
       if (typeof item === 'object' && item !== null) {
         // For array of objects, the first property starts right after the dash
         const itemYaml = convertToYAML(item, 0); // No base indentation for the object
@@ -479,6 +479,10 @@ function convertToYAML(obj: any, indent = 0): string {
       }
 
       if (typeof value === 'object') {
+        // Check if it's an empty object
+        if (Object.keys(value).length === 0) {
+          return `${indentStr}${key}: {}`;
+        }
         const objectYaml = convertToYAML(value, indent + 2);
         return `${indentStr}${key}:\n${objectYaml}`;
       }

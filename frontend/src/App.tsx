@@ -370,30 +370,32 @@ const RegistryDashboard: React.FC = () => {
                 <Grid item xs={12} md={6} key={registry.id}>
                   <Card
                     elevation={2}
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        elevation: 4,
-                        transform: 'translateY(-2px)',
-                        transition: 'all 0.2s ease-in-out'
-                      }
-                    }}
-                    onClick={() => handleRegistryClick(registry.id)}
                   >
                     <CardContent>
                       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                        <Typography variant="h6" component="h2">
+                        <Typography
+                          variant="h6"
+                          component="h2"
+                          sx={{
+                            cursor: 'pointer',
+                            color: 'primary.main',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={() => handleRegistryClick(registry.id)}
+                        >
                           {registry.name}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                           {registry.source && (
-                            <Chip
-                              icon={getSourceIcon(registry.source.type)}
-                              label={registry.source.type}
-                              color={getSourceColor(registry.source.type)}
-                              size="small"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`${registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}: ${registry.source.location}`}>
+                              <Chip
+                                icon={getSourceIcon(registry.source.type)}
+                                label={registry.source.type}
+                                color={getSourceColor(registry.source.type)}
+                                size="small"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           <Chip
                             label={registry.status}
@@ -403,103 +405,78 @@ const RegistryDashboard: React.FC = () => {
                         </Box>
                       </Box>
 
-                      {registry.description && (
-                        <Typography variant="body2" color="text.secondary" paragraph>
-                          {registry.description}
-                        </Typography>
-                      )}
-
-                      {/* Combined Source and API Info */}
-                      {(registry.source || registry.url) && (
-                        <Box sx={{ mb: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          {/* Source Information */}
-                          {registry.source && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: registry.url ? 1 : 0 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
-                                Source:
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  flex: 1,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  fontSize: '0.875rem'
-                                }}
-                              >
-                                {registry.source.location}
-                              </Typography>
-                            </Box>
-                          )}
-
-                          {/* API Information */}
-                          {registry.url && (
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '50px', mr: 1 }}>
-                                API:
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  flex: 1,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  mr: 1
-                                }}
-                              >
-                                {registry.url}
-                              </Typography>
-                              <Tooltip title="Copy API URL">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyToClipboard(registry.url);
-                                  }}
-                                >
-                                  <CopyIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-
                       {/* Registry Info Badges */}
                       <Box sx={{ mb: 2, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
                         {/* Sync Status Badge */}
                         {registry.source?.syncInterval && (
-                          <Chip
-                            icon={<SyncIcon fontSize="small" />}
-                            label={registry.source.syncInterval === 'manual' ? 'Manual' : `Auto (${registry.source.syncInterval})`}
-                            size="small"
-                            color={registry.source.syncInterval === 'manual' ? 'default' : 'success'}
-                            variant="outlined"
-                          />
+                          <Tooltip title={`Sync policy: ${registry.source.syncInterval === 'manual' ? 'Manual sync only' : `Automatic, every ${registry.source.syncInterval}`}`}>
+                            <Chip
+                              icon={<SyncIcon fontSize="small" />}
+                              label={registry.source.syncInterval === 'manual' ? 'Manual' : `Auto (${registry.source.syncInterval})`}
+                              size="small"
+                              color={registry.source.syncInterval === 'manual' ? 'default' : 'success'}
+                              variant="outlined"
+                            />
+                          </Tooltip>
                         )}
 
                         {/* Server Count Badge */}
-                        <Chip
-                          label={`${registry.serverCount} Server${registry.serverCount !== 1 ? 's' : ''}`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
+                        <Tooltip title={`Servers: ${registry.serverCount} available in this registry`}>
+                          <Chip
+                            label={`${registry.serverCount} Server${registry.serverCount !== 1 ? 's' : ''}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </Tooltip>
 
                         {/* Last Sync Badge */}
-                        <Chip
-                          label={registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
-                          size="small"
-                          color={registry.lastSyncAt ? 'info' : 'warning'}
-                          variant="outlined"
-                        />
+                        <Tooltip title={`Last sync: ${registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synchronized'}`}>
+                          <Chip
+                            label={registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
+                            size="small"
+                            color={registry.lastSyncAt ? 'info' : 'warning'}
+                            variant="outlined"
+                          />
+                        </Tooltip>
                       </Box>
+
+                      {registry.description && (
+                        <Typography variant="body2" color="text.secondary" paragraph sx={{ mb: 2 }}>
+                          {registry.description}
+                        </Typography>
+                      )}
+
+                      {/* API Information */}
+                      {registry.url && (
+                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mr: 1
+                            }}
+                          >
+                            {registry.url}
+                          </Typography>
+                          <Tooltip title="Copy API URL">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(registry.url);
+                              }}
+                            >
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      )}
 
                       <Typography variant="caption" display="block" sx={{ mt: 2 }}>
                         Created: {formatDate(registry.createdAt)}
@@ -1193,8 +1170,8 @@ const RegistryDetailPage: React.FC = () => {
               onChange={handleTabChange}
               aria-label="registry server tabs"
             >
-              <Tab label="Available Servers" {...a11yProps(0)} />
-              <Tab label="Deployed Servers" {...a11yProps(1)} />
+              <Tab label={`Available Servers (${filteredServers.length})`} {...a11yProps(0)} />
+              <Tab label={`Deployed Servers (${filteredDeployedServers.length})`} {...a11yProps(1)} />
             </Tabs>
           </Box>
 
@@ -1229,28 +1206,34 @@ const RegistryDetailPage: React.FC = () => {
                         {/* Left side: Configuration badges */}
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
                           {server.tier && (
-                            <Chip
-                              label={server.tier}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Tier: ${server.tier}`}>
+                              <Chip
+                                label={server.tier}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {server.transport && (
-                            <Chip
-                              label={server.transport}
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Transport: ${server.transport}`}>
+                              <Chip
+                                label={server.transport}
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {(server.tools_count !== undefined && server.tools_count > 0) && (
-                            <Chip
-                              label={`${server.tools_count} tools`}
-                              size="small"
-                              color="info"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Tools: ${server.tools_count} available`}>
+                              <Chip
+                                label={`${server.tools_count} tools`}
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {server.tags && server.tags.length > 0 && server.tags.slice(0, 2).map((tag) => (
                             <Chip key={tag} label={tag} size="small" />
@@ -1340,28 +1323,34 @@ const RegistryDetailPage: React.FC = () => {
                         {/* Left side: Configuration badges */}
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
                           {server.transport && (
-                            <Chip
-                              label={server.transport}
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Transport: ${server.transport}`}>
+                              <Chip
+                                label={server.transport}
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {server.tier && (
-                            <Chip
-                              label={server.tier}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Tier: ${server.tier}`}>
+                              <Chip
+                                label={server.tier}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {(server.tools_count !== undefined && server.tools_count > 0) && (
-                            <Chip
-                              label={`${server.tools_count} tools`}
-                              size="small"
-                              color="info"
-                              variant="outlined"
-                            />
+                            <Tooltip title={`Tools: ${server.tools_count} available`}>
+                              <Chip
+                                label={`${server.tools_count} tools`}
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                              />
+                            </Tooltip>
                           )}
                           {server.tags && server.tags.length > 0 && server.tags
                             .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
@@ -1374,84 +1363,89 @@ const RegistryDetailPage: React.FC = () => {
                         {/* Right side: Status badges */}
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                           {server.status && (
-                            <Chip
-                              label={server.status}
-                              size="small"
-                              color={server.status === 'Running' ? 'success' : 'error'}
-                              variant="filled"
-                            />
+                            <Tooltip title={`Status: ${server.status}`}>
+                              <Chip
+                                label={server.status}
+                                size="small"
+                                color={server.status === 'Running' ? 'success' : 'error'}
+                                variant="filled"
+                              />
+                            </Tooltip>
                           )}
                           {server.ready !== undefined && (
-                            <Chip
-                              label={server.ready ? 'Ready' : 'Not Ready'}
-                              size="small"
-                              color={server.ready ? 'success' : 'warning'}
-                              variant="filled"
-                            />
+                            <Tooltip title={server.ready ? 'Ready: Yes' : 'Ready: No'}>
+                              <Chip
+                                label={server.ready ? 'Ready' : 'Not Ready'}
+                                size="small"
+                                color={server.ready ? 'success' : 'warning'}
+                                variant="filled"
+                              />
+                            </Tooltip>
                           )}
                         </Box>
                       </Box>
 
-                      {server.image && (
-                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '45px', mr: 1 }}>
-                            Image:
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              fontFamily: 'monospace',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              mr: 1
-                            }}
-                          >
-                            {server.image}{server.version && `:${server.version}`}
-                          </Typography>
-                          <Tooltip title="Copy Image">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(`${server.image}${server.version ? `:${server.version}` : ''}`);
-                              }}
-                            >
-                              <CopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      )}
+                      {(server.image || server.endpoint_url) && (
+                        <Box sx={{ mb: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
+                          {server.image && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: server.endpoint_url ? 1 : 0 }}>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  mr: 1
+                                }}
+                              >
+                                {server.image}{server.version && `:${server.version}`}
+                              </Typography>
+                              <Tooltip title="Copy Image">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyToClipboard(`${server.image}${server.version ? `:${server.version}` : ''}`);
+                                  }}
+                                >
+                                  <CopyIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          )}
 
-                      {server.endpoint_url && (
-                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              fontFamily: 'monospace',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              mr: 1
-                            }}
-                          >
-                            {server.endpoint_url}
-                          </Typography>
-                          <Tooltip title="Copy Endpoint">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(server.endpoint_url!);
-                              }}
-                            >
-                              <CopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {server.endpoint_url && (
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  mr: 1
+                                }}
+                              >
+                                {server.endpoint_url}
+                              </Typography>
+                              <Tooltip title="Copy Endpoint">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyToClipboard(server.endpoint_url!);
+                                  }}
+                                >
+                                  <CopyIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          )}
                         </Box>
                       )}
 
@@ -1523,13 +1517,15 @@ const RegistryDetailPage: React.FC = () => {
               <DialogTitle>
                 {selectedServer.name}
                 {selectedServer.tier && (
-                  <Chip
-                    label={selectedServer.tier}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    sx={{ ml: 2 }}
-                  />
+                  <Tooltip title={`Server tier: ${selectedServer.tier === 'official' ? 'Official ToolHive server, maintained by the core team' : selectedServer.tier === 'community' ? 'Community-maintained server, verified for quality' : 'Third-party server, use with caution'}`}>
+                    <Chip
+                      label={selectedServer.tier}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ ml: 2 }}
+                    />
+                  </Tooltip>
                 )}
               </DialogTitle>
               <DialogContent sx={{ p: 0 }}>
@@ -1544,28 +1540,34 @@ const RegistryDetailPage: React.FC = () => {
                   {/* Status and Transport Chips */}
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, overflowX: 'auto' }}>
                     {selectedServer.transport && (
-                      <Chip
-                        label={selectedServer.transport}
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                      />
+                      <Tooltip title={`Transport: ${selectedServer.transport}`}>
+                        <Chip
+                          label={selectedServer.transport}
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                        />
+                      </Tooltip>
                     )}
                     {selectedServer.status && (
-                      <Chip
-                        label={selectedServer.status}
-                        size="small"
-                        color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
-                        variant="filled"
-                      />
+                      <Tooltip title={`Deployment status: ${selectedServer.status === 'Running' ? 'Server is running and operational' : selectedServer.status === 'Active' ? 'Server is active and available' : selectedServer.status === 'Pending' ? 'Server deployment is in progress' : selectedServer.status === 'Failed' ? 'Server deployment failed' : `Current status: ${selectedServer.status}`}`}>
+                        <Chip
+                          label={selectedServer.status}
+                          size="small"
+                          color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
+                          variant="filled"
+                        />
+                      </Tooltip>
                     )}
                     {selectedServer.ready !== undefined && (
-                      <Chip
-                        label={selectedServer.ready ? 'Ready' : 'Not Ready'}
-                        size="small"
-                        color={selectedServer.ready ? 'success' : 'warning'}
-                        variant="outlined"
-                      />
+                      <Tooltip title={selectedServer.ready ? 'Server is ready to accept connections and process requests' : 'Server is not ready - may be starting up or experiencing issues'}>
+                        <Chip
+                          label={selectedServer.ready ? 'Ready' : 'Not Ready'}
+                          size="small"
+                          color={selectedServer.ready ? 'success' : 'warning'}
+                          variant="outlined"
+                        />
+                      </Tooltip>
                     )}
                   </Box>
 
@@ -1573,28 +1575,34 @@ const RegistryDetailPage: React.FC = () => {
                   {selectedServer.metadata && (
                     <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
                       {selectedServer.metadata.stars !== undefined && (
-                        <Chip
-                          label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
+                        <Tooltip title={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}>
+                          <Chip
+                            label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </Tooltip>
                       )}
                       {selectedServer.metadata.pulls !== undefined && (
-                        <Chip
-                          label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
+                        <Tooltip title={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}>
+                          <Chip
+                            label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        </Tooltip>
                       )}
                       {selectedServer.metadata.last_updated && (
-                        <Chip
-                          label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
+                        <Tooltip title={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}>
+                          <Chip
+                            label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                          />
+                        </Tooltip>
                       )}
                     </Box>
                   )}

@@ -121,43 +121,29 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
       }}
       onClick={onClick}
     >
-      {/* Unregistered indicator */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          bgcolor: 'warning.main',
-          color: 'warning.contrastText',
-          px: 1,
-          py: 0.5,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 'bold',
-        }}
-      >
-        UNREGISTERED
-      </Box>
-
-      <CardContent sx={{ flexGrow: 1, pb: 1, pt: 5 }}>
+      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
         {/* Header with Name and Status */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <ServerIcon sx={{ mr: 1, color: 'text.secondary' }} />
-          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography
-              variant="h6"
-              component="h3"
-              sx={{
-                fontWeight: 600,
-                mb: 0.5,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {server.name}
-            </Typography>
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Typography
+            variant="h6"
+            component="h3"
+            sx={{
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+              mr: 1
+            }}
+          >
+            {server.name}
+          </Typography>
+          <Chip
+            label="Unregistered"
+            size="small"
+            color="warning"
+            variant="filled"
+          />
         </Box>
 
         {/* Status and Transport Chips */}
@@ -177,25 +163,51 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
         </Box>
 
         {/* Technical Details */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Image:
-          </Typography>
+        <Box sx={{ mb: 2, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
           <Typography
             variant="body2"
             sx={{
               fontFamily: 'monospace',
               fontSize: '0.75rem',
-              bgcolor: 'grey.100',
-              p: 1,
-              borderRadius: 1,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              mb: server.url ? 1 : 0
             }}
           >
             {server.image}
           </Typography>
+          {server.url && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: '0.75rem',
+                  fontFamily: 'monospace',
+                  flexGrow: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  mr: 1
+                }}
+              >
+                {server.url}
+              </Typography>
+              <Tooltip title="Copy URL">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(server.url!);
+                  }}
+                  aria-label="copy URL"
+                  sx={{ color: 'primary.main' }}
+                >
+                  <CopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
         </Box>
 
         {/* Ports */}
@@ -218,91 +230,12 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
           </Box>
         </Box>
 
-        {/* URL if available */}
-        {server.url && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-              URL:
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: '0.75rem',
-                  fontFamily: 'monospace',
-                  flexGrow: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(server.url, '_blank');
-                }}
-              >
-                {server.url}
-              </Typography>
-              <Tooltip title="Copy URL">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(server.url!);
-                  }}
-                  aria-label="copy URL"
-                  sx={{ color: 'primary.main' }}
-                >
-                  <CopyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Open URL">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(server.url, '_blank');
-                  }}
-                  aria-label="open URL"
-                  sx={{ color: 'primary.main' }}
-                >
-                  <LaunchIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              {onShowManifest && (
-                <Tooltip title="Show Manifest">
-                  <IconButton
-                    size="small"
-                    onClick={handleManifestClick}
-                    disabled={loadingManifest}
-                    aria-label="show manifest"
-                    sx={{
-                      color: 'white',
-                      backgroundColor: 'primary.main',
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <ManifestIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
-          </Box>
-        )}
 
         {/* Metadata */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <NamespaceIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-            <Typography variant="caption" color="text.secondary">
-              Namespace: {server.namespace}
-            </Typography>
-          </Box>
+          <Typography variant="caption" color="text.secondary">
+            Namespace: {server.namespace}
+          </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <ClockIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
             <Typography variant="caption" color="text.secondary">
@@ -311,9 +244,22 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
           </Box>
         </Box>
 
-        {/* Actions section for manifest when no URL */}
-        {!server.url && onShowManifest && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+
+        {/* Register with Registry Button and Manifest Icon */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<ConnectIcon />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConnect(server);
+            }}
+            sx={{ flex: 1, mr: onShowManifest ? 1 : 0 }}
+          >
+            Register with Registry
+          </Button>
+          {onShowManifest && (
             <Tooltip title="Show Manifest">
               <IconButton
                 size="small"
@@ -332,23 +278,7 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
                 <ManifestIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-          </Box>
-        )}
-
-        {/* Register with Registry Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 'auto' }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<ConnectIcon />}
-            onClick={(e) => {
-              e.stopPropagation();
-              onConnect(server);
-            }}
-            fullWidth
-          >
-            Register with Registry
-          </Button>
+          )}
         </Box>
       </CardContent>
 

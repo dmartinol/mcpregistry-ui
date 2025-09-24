@@ -566,6 +566,19 @@ export class RegistryServerService {
             console.warn(`Failed to fetch raw server data for tags: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }
+
+        // Ensure metadata is preserved - if it's missing from fallback, try to fetch from raw data
+        if (!server.metadata || (!server.metadata.stars && !server.metadata.pulls && !server.metadata.last_updated)) {
+          try {
+            const rawServerData = await this.fetchRawServerDataFromRegistry(registryId, serverName);
+            if (rawServerData && (rawServerData as any).metadata) {
+              server.metadata = (rawServerData as any).metadata;
+              console.log(`🔍 [METADATA DEBUG] Restored metadata from raw data for ${serverName}:`, server.metadata);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch raw server data for metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
       }
 
       return server || null;
