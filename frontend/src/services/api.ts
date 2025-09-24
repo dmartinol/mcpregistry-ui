@@ -74,6 +74,7 @@ interface DeploymentConfig {
   environmentVariables: Array<{
     name: string;
     value: string;
+    required?: boolean;
   }>;
   namespace: string;
   registryName: string;
