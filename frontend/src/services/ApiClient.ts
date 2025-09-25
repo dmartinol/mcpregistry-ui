@@ -65,7 +65,7 @@ export class ApiClient {
     offset: number = 0
   ): Promise<RegistryListResponse> {
     const params = new URLSearchParams();
-    if (status) params.append('status', status);
+    if (status) {params.append('status', status);}
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
 

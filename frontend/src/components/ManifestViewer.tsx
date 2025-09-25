@@ -144,7 +144,7 @@ function parseContentForFolding(content: string, format: 'yaml' | 'json'): Parse
           const currentIndent = match?.[1]?.length || 0;
           for (let j = i + 1; j < lines.length; j++) {
             const nextLine = lines[j];
-            if (nextLine.trim() === '') continue; // Skip empty lines
+            if (nextLine.trim() === '') {continue;} // Skip empty lines
 
             const nextIndent = nextLine.match(/^(\s*)/)?.[1]?.length || 0;
             if (nextIndent > currentIndent) {
@@ -272,12 +272,12 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
   };
 
   const isLineFolded = (line: ParsedLine, foldState: FoldState, allLines: ParsedLine[]): boolean => {
-    if (!line.parentFoldId) return false;
+    if (!line.parentFoldId) {return false;}
 
     // Check if any parent fold is collapsed
     let current: string | undefined = line.parentFoldId;
     while (current) {
-      if (foldState[current]) return true;
+      if (foldState[current]) {return true;}
       // Find parent of current fold ID
       const parentLine = allLines.find(l => l.foldId === current);
       current = parentLine?.parentFoldId;
@@ -429,10 +429,10 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
 function convertToYAML(obj: any, indent = 0): string {
   const indentStr = ' '.repeat(indent);
 
-  if (obj === null) return 'null';
-  if (typeof obj === 'undefined') return 'undefined';
-  if (typeof obj === 'boolean') return obj.toString();
-  if (typeof obj === 'number') return obj.toString();
+  if (obj === null) {return 'null';}
+  if (typeof obj === 'undefined') {return 'undefined';}
+  if (typeof obj === 'boolean') {return obj.toString();}
+  if (typeof obj === 'number') {return obj.toString();}
   if (typeof obj === 'string') {
     // Use literal block scalar for very long strings or JSON strings
     if (obj.length > 100 || (obj.startsWith('{') && obj.endsWith('}'))) {
@@ -453,7 +453,7 @@ function convertToYAML(obj: any, indent = 0): string {
   }
 
   if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
+    if (obj.length === 0) {return '[]';}
     return obj.map((item) => {
       if (typeof item === 'object' && item !== null) {
         // For array of objects, the first property starts right after the dash
@@ -472,7 +472,7 @@ function convertToYAML(obj: any, indent = 0): string {
 
   if (typeof obj === 'object') {
     const keys = Object.keys(obj);
-    if (keys.length === 0) return '{}';
+    if (keys.length === 0) {return '{}';}
 
     return keys.map(key => {
       const value = obj[key];

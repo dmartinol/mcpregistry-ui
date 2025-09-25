@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { RegistryService } from '../services/RegistryService';
 import { RegistryServerService } from '../services/RegistryServerService';
-import { DeployedServerService } from '../services/DeployedServerService';
+// import { DeployedServerService } from '../services/DeployedServerService';
 import { KubernetesClient } from '../services/KubernetesClient';
 import {
   validateCreateRegistry,
@@ -13,7 +13,6 @@ import Joi from 'joi';
 const router = Router();
 const registryService = new RegistryService();
 const registryServerService = new RegistryServerService();
-const deployedServerService = new DeployedServerService();
 const kubernetesClient = new KubernetesClient();
 
 // GET /api/v1/registries
@@ -71,7 +70,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const registry = await registryService.createRegistry(value!);
     res.status(201).json(registry);
   } catch (error) {
-    console.error('Error creating registry:', error);
+    console.error('=== ERROR in POST /api/v1/registries ===');
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    console.error('Full error object:', error);
     if (error instanceof Error && error.message.includes('already exists')) {
       res.status(409).json({ error: error.message });
     } else {
@@ -167,7 +171,13 @@ router.post('/:id/sync', async (req: Request, res: Response): Promise<void> => {
 
 // Validation schemas for new endpoints
 const registryServersQuerySchema = Joi.object({
-  tags: Joi.array().items(Joi.string()).optional(),
+  tags: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.string().custom((value, _helpers) => {
+      // Handle comma-separated string tags from query parameters
+      return value.split(',').map((tag: string) => tag.trim());
+    })
+  ).optional(),
   limit: Joi.number().integer().min(1).max(100).default(50).optional(),
   offset: Joi.number().integer().min(0).default(0).optional(),
 });
@@ -175,6 +185,15 @@ const registryServersQuerySchema = Joi.object({
 const deployedServersQuerySchema = Joi.object({
   status: Joi.string().valid('Pending', 'Running', 'Failed', 'Terminating').optional(),
   namespace: Joi.string().optional(),
+  tags: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.string().custom((value, _helpers) => {
+      // Handle comma-separated string tags from query parameters
+      return value.split(',').map((tag: string) => tag.trim());
+    })
+  ).optional(),
+  limit: Joi.number().integer().min(1).max(100).default(50).optional(),
+  offset: Joi.number().integer().min(0).default(0).optional(),
 });
 
 const deployServerSchema = Joi.object({
@@ -255,8 +274,8 @@ router.get('/:registryId/deployed-servers', async (req: Request, res: Response):
       return;
     }
 
-    // Validate query parameters for registry server service
-    const { error, value } = registryServersQuerySchema.validate(req.query);
+    // Validate query parameters for deployed servers
+    const { error, value } = deployedServersQuerySchema.validate(req.query);
     if (error) {
       res.status(400).json({
         error: 'Invalid request parameters',

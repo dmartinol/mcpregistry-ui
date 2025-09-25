@@ -55,7 +55,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
 
   const handleManifestClick = async (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!onShowManifest) return;
+    if (!onShowManifest) {return;}
 
     setLoadingManifest(true);
     try {
@@ -72,10 +72,10 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
   const getTagColor = (tag: string): 'primary' | 'secondary' | 'success' | 'warning' | 'info' => {
     // Assign colors based on common tag categories
     const tagLower = tag.toLowerCase();
-    if (['web', 'api', 'http'].includes(tagLower)) return 'primary';
-    if (['database', 'sql', 'storage'].includes(tagLower)) return 'info';
-    if (['file', 'processing', 'utility'].includes(tagLower)) return 'success';
-    if (['scraping', 'automation'].includes(tagLower)) return 'warning';
+    if (['web', 'api', 'http'].includes(tagLower)) {return 'primary';}
+    if (['database', 'sql', 'storage'].includes(tagLower)) {return 'info';}
+    if (['file', 'processing', 'utility'].includes(tagLower)) {return 'success';}
+    if (['scraping', 'automation'].includes(tagLower)) {return 'warning';}
     return 'secondary';
   };
 

@@ -129,7 +129,7 @@ export class RegistryServerService {
    * @param query Query parameters
    * @returns Promise resolving to raw server list
    */
-  private async fetchServersViaK8sProxy(registryId: string, clusterUrl: string, query: RegistryServersQuery): Promise<RegistryServer[]> {
+  private async fetchServersViaK8sProxy(registryId: string, clusterUrl: string, _query: RegistryServersQuery): Promise<RegistryServer[]> {
     try {
       // Import here to avoid circular dependencies
       const { KubernetesClient } = await import('./KubernetesClient');
@@ -346,7 +346,7 @@ export class RegistryServerService {
    * @param query Query parameters
    * @returns Promise resolving to raw deployed server list
    */
-  private async fetchDeployedServersFromRegistry(registryId: string, query: RegistryServersQuery): Promise<RegistryServer[]> {
+  private async fetchDeployedServersFromRegistry(registryId: string, _query: RegistryServersQuery): Promise<RegistryServer[]> {
     try {
       // Deployed servers are Kubernetes MCPServer resources, not stored in the registry
       // We need to fetch them directly from Kubernetes API
@@ -500,7 +500,7 @@ export class RegistryServerService {
    * @param query Query parameters
    * @returns Promise resolving to raw deployed server list
    */
-  private async fetchDeployedServersViaK8sProxy(registryId: string, clusterUrl: string, query: RegistryServersQuery): Promise<RegistryServer[]> {
+  private async fetchDeployedServersViaK8sProxy(registryId: string, clusterUrl: string, _query: RegistryServersQuery): Promise<RegistryServer[]> {
     try {
       // Import here to avoid circular dependencies
       const { KubernetesClient } = await import('./KubernetesClient');

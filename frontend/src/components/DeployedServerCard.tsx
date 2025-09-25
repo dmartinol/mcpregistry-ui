@@ -133,7 +133,7 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
 
   const handleManifestClick = async (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!onShowManifest) return;
+    if (!onShowManifest) {return;}
 
     setLoadingManifest(true);
     try {
@@ -153,11 +153,11 @@ export const DeployedServerCard: React.FC<DeployedServerCardProps> = ({ server, 
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1) {return 'Just now';}
+    if (diffInMinutes < 60) {return `${diffInMinutes}m ago`;}
 
     const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInHours < 24) {return `${diffInHours}h ago`;}
 
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays}d ago`;

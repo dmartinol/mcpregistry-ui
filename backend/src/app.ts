@@ -59,7 +59,7 @@ serversRouter.delete('/:serverId', async (req, res) => {
 app.use('/api/v1/servers', serversRouter);
 
 // Unregistered servers routes
-import { OrphanedServer } from './services/KubernetesClient';
+// import { OrphanedServer } from './services/KubernetesClient';
 
 const orphanedServersRouter = Router();
 
@@ -156,7 +156,7 @@ orphanedServersRouter.get('/:serverId/manifest', async (req, res) => {
 app.use('/api/v1/orphaned-servers', orphanedServersRouter);
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });

@@ -311,7 +311,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
     { value: 'network', label: 'Network (Network access permissions)' },
   ];
 
-  if (!server) return null;
+  if (!server) {return null;}
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>

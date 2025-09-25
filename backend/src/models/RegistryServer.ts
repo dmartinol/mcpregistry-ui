@@ -91,7 +91,7 @@ export const registryServerSchema = Joi.object<RegistryServer>({
     }),
 
   image: Joi.string()
-    .pattern(/^[a-z0-9.\-\/]+(?::[a-z0-9.\-]+)?$/i)
+    .pattern(/^[a-z0-9.-/]+(?::[a-z0-9.-]+)?$/i)
     .required()
     .messages({
       'string.pattern.base': 'Image must be a valid container image reference (registry/image[:tag])'

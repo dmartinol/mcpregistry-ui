@@ -165,7 +165,7 @@ export class DeployedServerService {
    * @param query Query parameters
    * @returns Promise resolving to deployed server list
    */
-  private async fetchDeployedFromKubernetes(registryId: string, query: DeployedServersQuery): Promise<DeployedServer[]> {
+  private async fetchDeployedFromKubernetes(registryId: string, _query: DeployedServersQuery): Promise<DeployedServer[]> {
     // TODO: Implement actual Kubernetes API calls
     // This would typically involve:
     // 1. Listing MCPServer resources with registryRef label selector

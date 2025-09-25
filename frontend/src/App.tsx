@@ -606,7 +606,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleSourceClick = (registry: Registry) => {
-    if (!registry.source) return;
+    if (!registry.source) {return;}
 
     if (registry.source.type === 'configmap') {
       const { name } = parseConfigMapLocation(registry.source.location);
@@ -657,7 +657,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleShowConfigMapManifest = async (configMapName: string, namespace: string) => {
-    if (!registryId) return;
+    if (!registryId) {return;}
 
     setLoadingManifest(true);
     try {
@@ -673,7 +673,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleShowRegistryManifest = async () => {
-    if (!registryId) return;
+    if (!registryId) {return;}
 
     setLoadingManifest(true);
     try {
@@ -689,7 +689,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleForceSync = async (event: React.MouseEvent) => {
-    if (!registryId) return;
+    if (!registryId) {return;}
 
     event.stopPropagation();
     try {
@@ -710,7 +710,7 @@ const RegistryDetailPage: React.FC = () => {
   const loadData = async (isRefresh = false) => {
     if (!registryId) {
       setError('Registry ID is required');
-      if (!isRefresh) setLoading(false);
+      if (!isRefresh) {setLoading(false);}
       return;
     }
 
@@ -807,7 +807,7 @@ const RegistryDetailPage: React.FC = () => {
   const getAllTransports = () => {
     const transports = new Set<string>();
     [...servers, ...deployedServers].forEach(server => {
-      if (server.transport) transports.add(server.transport);
+      if (server.transport) {transports.add(server.transport);}
     });
     return Array.from(transports);
   };
@@ -815,7 +815,7 @@ const RegistryDetailPage: React.FC = () => {
   const getAllTiers = () => {
     const tiers = new Set<string>();
     [...servers, ...deployedServers].forEach(server => {
-      if (server.tier) tiers.add(server.tier);
+      if (server.tier) {tiers.add(server.tier);}
     });
     return Array.from(tiers);
   };
@@ -823,7 +823,7 @@ const RegistryDetailPage: React.FC = () => {
   const getAllStatuses = () => {
     const statuses = new Set<string>();
     deployedServers.forEach(server => {
-      if (server.status) statuses.add(server.status);
+      if (server.status) {statuses.add(server.status);}
     });
     return Array.from(statuses);
   };
@@ -884,7 +884,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleDeploy = async (config: DeploymentConfig) => {
-    if (!selectedServer || !selectedRegistry) return;
+    if (!selectedServer || !selectedRegistry) {return;}
 
     try {
       await api.deployServer(selectedRegistry.id, selectedServer.name, config);
@@ -900,7 +900,7 @@ const RegistryDetailPage: React.FC = () => {
   };
 
   const handleDeleteServer = async () => {
-    if (!serverToDelete || !registryId) return;
+    if (!serverToDelete || !registryId) {return;}
 
     setDeleting(true);
     try {

@@ -2,7 +2,7 @@ import request from 'supertest';
 import { app } from '../../src/app';
 
 describe('Contract Test: GET /api/v1/registries/{registryId}/deployed-servers', () => {
-  const validRegistryId = 'test-registry';
+  const validRegistryId = 'mock-registry-system';
   const invalidRegistryId = 'invalid-registry';
 
   beforeEach(() => {

@@ -97,7 +97,7 @@ describe('Registry Management Workflow - Integration Test', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Check registry status shows error
-    const detailsResponse = await request(app)
+    const _detailsResponse = await request(app)
       .get(`/api/v1/registries/${registryId}`)
       .expect(200);
 

@@ -121,7 +121,7 @@ class ApiError extends Error {
   }
 }
 
-async function fetchWithErrorHandling(url: string, options?: RequestInit) {
+async function fetchWithErrorHandling(url: string, options?: Record<string, any>) {
   try {
     const response = await fetch(url, {
       headers: {

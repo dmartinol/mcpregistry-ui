@@ -129,7 +129,7 @@ export const RegistryDetailPage: React.FC = () => {
 
   // Force sync function
   const handleForceSync = async () => {
-    if (!registryId || isSyncing) return;
+    if (!registryId || isSyncing) {return;}
 
     try {
       setIsSyncing(true);
@@ -222,7 +222,7 @@ export const RegistryDetailPage: React.FC = () => {
   };
 
   const handleDeploy = async (config: DeploymentConfig) => {
-    if (!selectedServer || !registryId) return;
+    if (!selectedServer || !registryId) {return;}
 
     try {
       await api.deployServer(registryId, selectedServer.name, config);
@@ -247,7 +247,7 @@ export const RegistryDetailPage: React.FC = () => {
   };
 
   const handleShowServerManifest = async (serverName: string) => {
-    if (!registryId) return {};
+    if (!registryId) {return {};}
 
     try {
       return await api.getServerManifest(registryId, serverName);
@@ -258,7 +258,7 @@ export const RegistryDetailPage: React.FC = () => {
   };
 
   const handleShowDeployedServerManifest = async (serverName: string) => {
-    if (!registryId) return {};
+    if (!registryId) {return {};}
 
     try {
       return await api.getDeployedServerManifest(registryId, serverName);
@@ -269,7 +269,7 @@ export const RegistryDetailPage: React.FC = () => {
   };
 
   const handleShowConfigMapManifest = async (configMapName: string, namespace: string) => {
-    if (!registryId) return;
+    if (!registryId) {return;}
 
     setLoadingManifest(true);
     try {
@@ -293,7 +293,7 @@ export const RegistryDetailPage: React.FC = () => {
   };
 
   const handleSourceClick = (registry: Registry) => {
-    if (!registry.source) return;
+    if (!registry.source) {return;}
 
     if (registry.source.type === 'configmap') {
       const { name } = parseConfigMapLocation(registry.source.location);
