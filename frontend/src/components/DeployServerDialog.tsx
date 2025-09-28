@@ -27,6 +27,7 @@ import {
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
+import { getDisplayName } from '../utils/displayNames';
 
 interface EnvironmentVariable {
   name: string;
@@ -317,7 +318,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Deploy {server.name}</Typography>
+          <Typography variant="h6">Deploy {getDisplayName(server.name)}</Typography>
           <IconButton onClick={onClose}>
             <CloseIcon />
           </IconButton>

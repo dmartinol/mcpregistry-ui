@@ -18,6 +18,22 @@ const durationSchema = Joi.string()
     'string.pattern.base': 'Duration must be in format like "30m", "1h", "2h30m" (s=seconds, m=minutes, h=hours, d=days)'
   });
 
+// Sync interval validation (duration or "manual")
+const syncIntervalSchema = Joi.string()
+  .custom((value, helpers) => {
+    if (value === 'manual') {
+      return value;
+    }
+    // Validate as duration pattern
+    if (/^(\d+[smhd])+$/.test(value)) {
+      return value;
+    }
+    return helpers.error('string.pattern.base');
+  })
+  .messages({
+    'string.pattern.base': 'Sync interval must be "manual" or a duration like "30m", "1h", "2h30m" (s=seconds, m=minutes, h=hours, d=days)'
+  });
+
 // Git URL validation
 const gitUrlSchema = Joi.string()
   .uri({ scheme: ['https'] })
@@ -154,7 +170,7 @@ const filterSchema = Joi.object({
 
 // Sync policy schema
 const syncPolicySchema = Joi.object({
-  interval: durationSchema
+  interval: syncIntervalSchema
     .required()
     .description('Sync interval (e.g., "30m", "1h", "manual" for manual sync only)')
 }).optional().description('Registry synchronization policy');

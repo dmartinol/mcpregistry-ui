@@ -10,13 +10,16 @@ import {
   FormControlLabel,
   Switch,
   Divider,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   FilterList as FilterIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { CreateMCPRegistryRequest } from '../CreateRegistryDialog';
+import { api } from '../../services/api';
 
 interface DataFilteringTabProps {
   formData: CreateMCPRegistryRequest;
@@ -31,6 +34,67 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
   const [newNameExcludeFilter, setNewNameExcludeFilter] = React.useState('');
   const [newTagIncludeFilter, setNewTagIncludeFilter] = React.useState('');
   const [newTagExcludeFilter, setNewTagExcludeFilter] = React.useState('');
+
+  // Tag suggestions state
+  const [availableTags, setAvailableTags] = React.useState<string[]>([]);
+  const [loadingTags, setLoadingTags] = React.useState(false);
+  const [tagsError, setTagsError] = React.useState<string | null>(null);
+
+  // Function to fetch available tags from the selected data source
+  const fetchAvailableTags = React.useCallback(async () => {
+    // Check if we have a complete data source configuration
+    if (!formData.source?.type) {
+      return;
+    }
+
+    if (formData.source.type === 'configmap') {
+      if (!formData.source.configmap?.name || !formData.source.configmap?.key) {
+        return;
+      }
+    } else if (formData.source.type === 'git') {
+      if (!formData.source.git?.repository || !formData.source.git?.path) {
+        return;
+      }
+    }
+
+    setLoadingTags(true);
+    setTagsError(null);
+
+    try {
+      const dataSource = {
+        type: formData.source.type,
+        ...(formData.source.type === 'configmap' && {
+          configmap: {
+            name: formData.source.configmap!.name,
+            key: formData.source.configmap!.key,
+            namespace: formData.namespace || 'toolhive-system',
+          }
+        }),
+        ...(formData.source.type === 'git' && {
+          git: {
+            repository: formData.source.git!.repository,
+            branch: formData.source.git!.branch,
+            path: formData.source.git!.path,
+          }
+        }),
+      };
+
+      const tags = await api.getDataSourceTags(dataSource);
+      setAvailableTags(tags);
+      console.log(`Fetched ${tags.length} available tags:`, tags);
+    } catch (error) {
+      console.error('Error fetching available tags:', error);
+      setTagsError(error instanceof Error ? error.message : 'Failed to load available tags');
+      setAvailableTags([]);
+    } finally {
+      setLoadingTags(false);
+    }
+  }, [formData.source, formData.namespace]);
+
+  // Auto-fetch tags when data source changes
+  React.useEffect(() => {
+    fetchAvailableTags();
+  }, [fetchAvailableTags]);
 
   const handleAddNameIncludeFilter = () => {
     if (newNameIncludeFilter.trim()) {
@@ -326,9 +390,21 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
               <FilterIcon />
               Tag Filters
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Configure tags to include or exclude servers. Tag names are case-sensitive.
             </Typography>
+
+            {availableTags.length > 0 && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Found {availableTags.length} available tags from the selected data source. Use the dropdown to select from existing tags or type your own.
+              </Alert>
+            )}
+
+            {tagsError && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                Could not load tags from data source: {tagsError}. You can still enter tag names manually.
+              </Alert>
+            )}
 
             {/* Include Tag Filters */}
             <Box sx={{ mb: 3 }}>
@@ -340,15 +416,26 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
+                <Autocomplete
                   fullWidth
                   size="small"
-                  label="Add include tag"
+                  freeSolo
+                  options={availableTags}
                   value={newTagIncludeFilter}
-                  onChange={(e) => setNewTagIncludeFilter(e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, handleAddTagIncludeFilter)}
-                  placeholder="e.g., database, ai, web, utility"
-                  helperText="Tag names are case-sensitive"
+                  onInputChange={(_, newInputValue) => {
+                    setNewTagIncludeFilter(newInputValue);
+                  }}
+                  loading={loadingTags}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Add include tag"
+                      placeholder="e.g., database, ai, web, utility"
+                      helperText={tagsError ? tagsError : "Tag names are case-sensitive"}
+                      error={!!tagsError}
+                      onKeyPress={(e) => handleKeyPress(e, handleAddTagIncludeFilter)}
+                    />
+                  )}
                 />
                 <IconButton
                   onClick={handleAddTagIncludeFilter}
@@ -356,6 +443,15 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
                   color="primary"
                 >
                   <AddIcon />
+                </IconButton>
+                <IconButton
+                  onClick={fetchAvailableTags}
+                  disabled={loadingTags}
+                  color="primary"
+                  size="small"
+                  title="Refresh tag suggestions"
+                >
+                  <RefreshIcon />
                 </IconButton>
               </Box>
 
@@ -385,15 +481,26 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
+                <Autocomplete
                   fullWidth
                   size="small"
-                  label="Add exclude tag"
+                  freeSolo
+                  options={availableTags}
                   value={newTagExcludeFilter}
-                  onChange={(e) => setNewTagExcludeFilter(e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, handleAddTagExcludeFilter)}
-                  placeholder="e.g., deprecated, experimental, legacy"
-                  helperText="Tag names are case-sensitive"
+                  onInputChange={(_, newInputValue) => {
+                    setNewTagExcludeFilter(newInputValue);
+                  }}
+                  loading={loadingTags}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Add exclude tag"
+                      placeholder="e.g., deprecated, experimental, legacy"
+                      helperText={tagsError ? tagsError : "Tag names are case-sensitive"}
+                      error={!!tagsError}
+                      onKeyPress={(e) => handleKeyPress(e, handleAddTagExcludeFilter)}
+                    />
+                  )}
                 />
                 <IconButton
                   onClick={handleAddTagExcludeFilter}

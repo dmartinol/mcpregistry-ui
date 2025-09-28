@@ -161,9 +161,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     } else {
       console.log('MCPRegistry creation failed:', result.message);
       if (result.errors) {
+        // Extract the most specific error message from validation details
+        const specificError = result.errors.details?.[0]?.message || result.message || 'Validation failed';
         res.status(400).json({
           success: false,
-          error: result.message || 'Validation failed',
+          error: specificError,
           details: result.errors.details?.map(d => d.message) || []
         });
       } else {

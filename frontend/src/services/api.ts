@@ -529,6 +529,30 @@ export const api = {
   }> {
     return fetchWithErrorHandling(`${API_BASE_URL}/mcpregistries/${name}/status`);
   },
+
+  // Data source tag operations
+  async getDataSourceTags(dataSource: {
+    type: 'configmap' | 'git';
+    configmap?: {
+      name: string;
+      key: string;
+      namespace?: string;
+    };
+    git?: {
+      repository: string;
+      branch?: string;
+      path: string;
+    };
+  }): Promise<string[]> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/data-sources/tags`,
+      {
+        method: 'POST',
+        body: JSON.stringify(dataSource),
+      }
+    );
+    return response.tags;
+  },
 };
 
 export { ApiError };

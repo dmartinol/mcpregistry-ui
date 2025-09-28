@@ -18,6 +18,7 @@ import {
   Code as ManifestIcon,
 } from '@mui/icons-material';
 import { ManifestViewer } from './ManifestViewer';
+import { getDisplayName } from '../utils/displayNames';
 
 interface RegistryServer {
   name: string;
@@ -79,6 +80,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
     return 'secondary';
   };
 
+
   return (
     <Card
       sx={{
@@ -119,7 +121,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
                 whiteSpace: 'nowrap',
               }}
             >
-              {server.name}
+              {getDisplayName(server.name)}
             </Typography>
             <Typography
               variant="body2"
@@ -300,7 +302,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
         <ManifestViewer
           open={manifestViewerOpen}
           onClose={() => setManifestViewerOpen(false)}
-          title={`${server.name} Server`}
+          title={`${getDisplayName(server.name)} Server`}
           manifest={manifest}
         />
       )}

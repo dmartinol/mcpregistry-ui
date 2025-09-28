@@ -504,7 +504,7 @@ export class KubernetesClient {
 
     const result = {
       id: mcpRegistry.metadata.name,
-      name: mcpRegistry.metadata.name,
+      name: mcpRegistry.spec.displayName || mcpRegistry.metadata.name,
       url: (mcpRegistry.status as any)?.apiEndpoint || mcpRegistry.spec.url || '',
       description: mcpRegistry.spec.description,
       status,

@@ -51,6 +51,7 @@ import { OrphanedServersView } from './components/OrphanedServersView';
 import { ManifestViewer } from './components/ManifestViewer';
 import { CreateRegistryDialog, CreateMCPRegistryRequest } from './components/CreateRegistryDialog';
 import { api, DeploymentConfig, MCPRegistryRequest } from './services/api';
+import { getDisplayName } from './utils/displayNames';
 
 export interface Registry {
   id: string;
@@ -153,6 +154,7 @@ function a11yProps(index: number) {
     'aria-controls': `registry-tabpanel-${index}`,
   };
 }
+
 
 const RegistryDashboard: React.FC = () => {
   const [registries, setRegistries] = useState<Registry[]>([]);
@@ -999,7 +1001,7 @@ const RegistryDetailPage: React.FC = () => {
     try {
       const manifestData = await api.getServerManifest(registryId!, serverName);
       setManifest(manifestData);
-      setManifestTitle(`${serverName} Server`);
+      setManifestTitle(`${getDisplayName(serverName)} Server`);
       setManifestViewerOpen(true);
     } catch (error) {
       console.error('Failed to load server manifest:', error);
@@ -1354,7 +1356,7 @@ const RegistryDetailPage: React.FC = () => {
                         }}
                         onClick={() => handleServerClick(server, false)}
                       >
-                        {server.name}
+                        {getDisplayName(server.name)}
                       </Typography>
 
                       {/* Badges Row: Config badges on left, Status badges on right */}
@@ -1786,6 +1788,24 @@ const RegistryDetailPage: React.FC = () => {
                   {/* Technical Details Section */}
 
                   <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, p: 2, fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                    {selectedRegistry && (
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                          Registry:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                          {selectedRegistry.name}
+                        </Typography>
+                        <Tooltip title="Copy Registry Name">
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(selectedRegistry.name)}
+                          >
+                            <CopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
                     <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
                         Image:

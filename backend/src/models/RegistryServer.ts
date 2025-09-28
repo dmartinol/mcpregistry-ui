@@ -64,6 +64,7 @@ export interface RegistryServer {
     description: string;
     required: boolean;
     secret?: boolean;
+    default?: string;
   }>;
 
   /** Server metadata and statistics */
@@ -170,7 +171,8 @@ export const registryServerSchema = Joi.object<RegistryServer>({
       name: Joi.string().required(),
       description: Joi.string().required(),
       required: Joi.boolean().required(),
-      secret: Joi.boolean().optional()
+      secret: Joi.boolean().optional(),
+      default: Joi.string().optional()
     })
   ).optional(),
   metadata: Joi.object().unknown(true).optional(),
