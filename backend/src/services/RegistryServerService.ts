@@ -117,8 +117,8 @@ export class RegistryServerService {
       return servers.map(server => this.validateServerData(server));
 
     } catch (error) {
-      console.warn(`Failed to fetch from registry ${registryId}, falling back to mock data:`, error);
-      return this.getMockServers();
+      console.error(`Failed to fetch from registry ${registryId}:`, error);
+      throw new Error(`Failed to fetch servers from registry ${registryId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -244,42 +244,6 @@ export class RegistryServerService {
     });
   }
 
-  /**
-   * Get mock servers as fallback
-   */
-  private getMockServers(): RegistryServer[] {
-    return [
-      {
-        name: 'web-scraper',
-        image: 'toolhive/web-scraper:1.2.0',
-        version: '1.2.0',
-        description: 'A powerful web scraping tool with JavaScript rendering support',
-        tags: ['web', 'scraping', 'automation'],
-        capabilities: ['tools', 'resources'],
-        author: 'ToolHive Team',
-        repository: 'https://github.com/toolhive/web-scraper',
-        documentation: 'https://docs.toolhive.com/web-scraper',
-      },
-      {
-        name: 'database-manager',
-        image: 'toolhive/database-manager:2.1.0',
-        version: '2.1.0',
-        description: 'Multi-database management tool with query capabilities',
-        tags: ['database', 'sql', 'management'],
-        capabilities: ['tools'],
-        author: 'Database Team',
-        repository: 'https://github.com/toolhive/database-manager',
-      },
-      {
-        name: 'file-processor',
-        image: 'toolhive/file-processor:latest',
-        description: 'Process and transform files in various formats',
-        tags: ['files', 'processing', 'utility'],
-        capabilities: ['tools', 'resources'],
-        author: 'Utils Team',
-      },
-    ];
-  }
 
   /**
    * Applies tag-based filtering to server list
@@ -433,8 +397,7 @@ export class RegistryServerService {
       const configMapData = configMap.data;
 
       if (!configMapData || !configMapData['registry.json']) {
-        console.warn(`No registry.json found in ConfigMap ${configMapName}, using mock data`);
-        return this.getMockServers();
+        throw new Error(`No registry.json found in ConfigMap ${configMapName} in namespace ${namespace}`);
       }
 
       const registryData = JSON.parse(configMapData['registry.json']);
@@ -451,9 +414,8 @@ export class RegistryServerService {
 
       return servers;
     } catch (error) {
-      console.warn(`Failed to fetch from ConfigMap for registry ${registryId}:`, error);
-      console.log('Falling back to mock data');
-      return this.getMockServers();
+      console.error(`Failed to fetch from ConfigMap for registry ${registryId}:`, error);
+      throw new Error(`Failed to fetch servers from ConfigMap for registry ${registryId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -643,10 +605,23 @@ export class RegistryServerService {
 
 
       if (server) {
-        // Fix tools_count vs tools mismatch
+        // Ensure tools are preserved - if they're missing from fallback, try to fetch from raw data
         if (server.tools_count && server.tools_count > 0 && (!server.tools || server.tools.length === 0)) {
-          console.log(`Generating placeholder tools for server ${serverName} (${server.tools_count} tools)`);
-          server.tools = Array.from({ length: server.tools_count }, (_, i) => `Available Tool ${i + 1}`);
+          try {
+            const rawServerData = await this.fetchRawServerDataFromRegistry(registryId, serverName);
+            if (rawServerData && (rawServerData as any).tools) {
+              server.tools = (rawServerData as any).tools;
+              console.log(`🔍 [TOOLS DEBUG] Restored tools from raw data for ${serverName}:`, server.tools);
+            } else {
+              // Only use placeholder if we really can't get the real tools
+              console.log(`Generating placeholder tools for server ${serverName} (${server.tools_count} tools) - no raw data available`);
+              server.tools = Array.from({ length: server.tools_count }, (_, i) => `Available Tool ${i + 1}`);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch raw server data for tools: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Fallback to placeholder tools if raw data fetch fails
+            server.tools = Array.from({ length: server.tools_count }, (_, i) => `Available Tool ${i + 1}`);
+          }
         }
 
         // Ensure env_vars is preserved - if it's missing from fallback, try to fetch from raw data

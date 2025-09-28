@@ -114,6 +114,85 @@ interface ConnectToRegistryRequest {
   serverNameInRegistry: string;
 }
 
+interface ConfigMapInfo {
+  name: string;
+  namespace: string;
+  keys: string[];
+  createdAt: string;
+}
+
+interface GitValidationResult {
+  valid: boolean;
+  accessible: boolean;
+  branches?: string[];
+  error?: string;
+  fileExists?: boolean;
+  fileContent?: string;
+}
+
+interface GitBranchInfo {
+  name: string;
+  isDefault: boolean;
+  lastCommitDate?: string;
+}
+
+interface MCPRegistryRequest {
+  name: string;
+  displayName: string;
+  namespace: string;
+  enforceServers?: boolean;
+  source: {
+    type: 'configmap' | 'git';
+    format: 'toolhive';
+    configmap?: {
+      name: string;
+      key: string;
+    };
+    git?: {
+      repository: string;
+      branch?: string;
+      path: string;
+    };
+  };
+  syncPolicy?: {
+    interval: string;
+  };
+  filter?: {
+    names?: {
+      include?: string[];
+      exclude?: string[];
+    };
+    tags?: {
+      include?: string[];
+      exclude?: string[];
+    };
+  };
+}
+
+interface MCPRegistryValidationResult {
+  valid: boolean;
+  errors?: {
+    details: Array<{
+      message: string;
+      path: string[];
+      type: string;
+    }>;
+  };
+  warnings?: string[];
+  sourceValidation?: {
+    valid: boolean;
+    error?: string;
+  };
+}
+
+interface MCPRegistryResponse {
+  success: boolean;
+  message?: string;
+  registry?: any;
+  error?: string;
+  details?: string[];
+}
+
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -315,6 +394,141 @@ export const api = {
       `${API_BASE_URL}/registries/${registryId}/configmap/${configMapName}/manifest?namespace=${namespace}`
     );
   },
+
+  // ConfigMap operations
+  async getConfigMaps(namespace?: string): Promise<ConfigMapInfo[]> {
+    let url = `${API_BASE_URL}/configmaps`;
+    if (namespace) {
+      const params = new URLSearchParams({ namespace });
+      url += `?${params.toString()}`;
+    }
+    const response = await fetchWithErrorHandling(url);
+    return response.configMaps;
+  },
+
+  async getConfigMapKeys(name: string, namespace: string): Promise<string[]> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/${namespace}/${name}/keys`
+    );
+    return response.keys;
+  },
+
+  async validateConfigMapKey(name: string, key: string, namespace: string): Promise<boolean> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/validate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, key, namespace }),
+      }
+    );
+    return response.valid;
+  },
+
+  // Git validation operations
+  async validateGitRepository(repository: string, branch?: string, path?: string): Promise<GitValidationResult> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/git/validate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repository, branch, path }),
+      }
+    );
+    return response;
+  },
+
+  async getGitBranches(repository: string, search?: string): Promise<GitBranchInfo[]> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/git/branches`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repository, search }),
+      }
+    );
+    return response.branches;
+  },
+
+  async validateGitFile(repository: string, path: string, branch?: string): Promise<GitValidationResult> {
+    const response = await fetchWithErrorHandling(
+      `${API_BASE_URL}/configmaps/git/validate-file`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repository, path, branch: branch || 'main' }),
+      }
+    );
+    return response;
+  },
+
+  // MCPRegistry operations
+  async validateMCPRegistry(request: MCPRegistryRequest): Promise<MCPRegistryValidationResult> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/mcpregistries/validate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    );
+  },
+
+  async createMCPRegistry(request: MCPRegistryRequest): Promise<MCPRegistryResponse> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/mcpregistries`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    );
+  },
+
+  async getMCPRegistries(namespace?: string): Promise<{ registries: any[]; total: number; namespace: string }> {
+    let url = `${API_BASE_URL}/mcpregistries`;
+    if (namespace) {
+      const params = new URLSearchParams({ namespace });
+      url += `?${params.toString()}`;
+    }
+    return fetchWithErrorHandling(url);
+  },
+
+  async getMCPRegistry(name: string): Promise<any> {
+    return fetchWithErrorHandling(`${API_BASE_URL}/mcpregistries/${name}`);
+  },
+
+  async updateMCPRegistry(name: string, request: Partial<MCPRegistryRequest>): Promise<MCPRegistryResponse> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/mcpregistries/${name}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(request),
+      }
+    );
+  },
+
+  async deleteMCPRegistry(name: string): Promise<void> {
+    await fetchWithErrorHandling(
+      `${API_BASE_URL}/mcpregistries/${name}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  },
+
+  async triggerMCPRegistrySync(name: string): Promise<{ success: boolean; message: string }> {
+    return fetchWithErrorHandling(
+      `${API_BASE_URL}/mcpregistries/${name}/sync`,
+      {
+        method: 'POST',
+      }
+    );
+  },
+
+  async getMCPRegistryStatus(name: string): Promise<{
+    phase?: string;
+    servers?: number;
+    lastSync?: string;
+    message?: string;
+    syncStatus?: any;
+  }> {
+    return fetchWithErrorHandling(`${API_BASE_URL}/mcpregistries/${name}/status`);
+  },
 };
 
 export { ApiError };
@@ -328,5 +542,11 @@ export type {
   DeploymentResponse,
   OrphanedServer,
   OrphanedServersResponse,
-  ConnectToRegistryRequest
+  ConnectToRegistryRequest,
+  ConfigMapInfo,
+  GitValidationResult,
+  GitBranchInfo,
+  MCPRegistryRequest,
+  MCPRegistryValidationResult,
+  MCPRegistryResponse
 };

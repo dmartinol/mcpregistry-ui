@@ -91,10 +91,20 @@ export const registryServerSchema = Joi.object<RegistryServer>({
     }),
 
   image: Joi.string()
-    .pattern(/^[a-z0-9.-/]+(?::[a-z0-9.-]+)?$/i)
+    .min(1)
+    .max(256)
     .required()
+    .custom((value, helpers) => {
+      // Basic validation: must not be empty and should contain reasonable characters
+      if (!/^[a-zA-Z0-9._/:@-]+$/.test(value)) {
+        return helpers.error('string.pattern.base');
+      }
+      return value;
+    })
     .messages({
-      'string.pattern.base': 'Image must be a valid container image reference (registry/image[:tag])'
+      'string.pattern.base': 'Image must be a valid container image reference (registry/image[:tag])',
+      'string.min': 'Image name cannot be empty',
+      'string.max': 'Image name must not exceed 256 characters'
     }),
 
   version: Joi.string()

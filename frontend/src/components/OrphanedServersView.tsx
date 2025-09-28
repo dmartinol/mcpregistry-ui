@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -27,7 +27,7 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState<OrphanedServer | null>(null);
 
-  const loadOrphanedServers = async () => {
+  const loadOrphanedServers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,11 +45,11 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentNamespace]);
 
   useEffect(() => {
     loadOrphanedServers();
-  }, [currentNamespace]);
+  }, [currentNamespace, loadOrphanedServers]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

@@ -21,7 +21,11 @@ app.get('/health', (req, res) => {
 
 // API routes
 import { registriesRouter } from './api/registries';
+import { configMapsRouter } from './api/configmaps';
+import { mcpRegistriesRouter } from './api/mcpregistries';
 app.use('/api/v1/registries', registriesRouter);
+app.use('/api/v1/configmaps', configMapsRouter);
+app.use('/api/v1/mcpregistries', mcpRegistriesRouter);
 
 // Server-specific routes
 import { Router } from 'express';

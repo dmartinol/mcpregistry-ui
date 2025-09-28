@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
@@ -44,11 +44,13 @@ import {
   Clear as ClearIcon,
   Delete as DeleteIcon,
   Code as ManifestIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { DeployServerDialog } from './components/DeployServerDialog';
 import { OrphanedServersView } from './components/OrphanedServersView';
 import { ManifestViewer } from './components/ManifestViewer';
-import { api, DeploymentConfig } from './services/api';
+import { CreateRegistryDialog, CreateMCPRegistryRequest } from './components/CreateRegistryDialog';
+import { api, DeploymentConfig, MCPRegistryRequest } from './services/api';
 
 export interface Registry {
   id: string;
@@ -166,6 +168,9 @@ const RegistryDashboard: React.FC = () => {
   const [manifest, setManifest] = useState<object | null>(null);
   const [manifestTitle, setManifestTitle] = useState('');
   const [loadingManifest, setLoadingManifest] = useState(false);
+
+  // Create Registry dialog state
+  const [createRegistryOpen, setCreateRegistryOpen] = useState(false);
 
   useEffect(() => {
     const loadRegistries = async () => {
@@ -295,6 +300,44 @@ const RegistryDashboard: React.FC = () => {
     }
   };
 
+  const handleCreateRegistry = async (request: CreateMCPRegistryRequest) => {
+    console.log('Creating registry with request:', request);
+
+    try {
+      // Convert CreateMCPRegistryRequest to MCPRegistryRequest format
+      const apiRequest: MCPRegistryRequest = {
+        name: request.name,
+        displayName: request.displayName,
+        namespace: request.namespace,
+        enforceServers: request.enforceServers,
+        source: request.source,
+        syncPolicy: request.syncPolicy,
+        filter: request.filter
+      };
+
+      // Create the MCPRegistry via API
+      const response = await api.createMCPRegistry(apiRequest);
+
+      if (response.success) {
+        console.log('MCPRegistry created successfully:', response.registry?.metadata?.name);
+
+        // Refresh registries to show the new one
+        try {
+          const registriesData = await api.getRegistries(currentNamespace);
+          setRegistries(registriesData);
+        } catch (refreshError) {
+          console.warn('Failed to refresh registries after creation:', refreshError);
+          // Don't throw here - the registry was created successfully
+        }
+      } else {
+        throw new Error(response.error || 'Failed to create registry');
+      }
+    } catch (error) {
+      console.error('Error creating MCPRegistry:', error);
+      throw error; // Re-throw so the dialog can handle the error display
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -362,15 +405,25 @@ const RegistryDashboard: React.FC = () => {
                     Showing registries from namespace: {currentNamespace}
                   </Typography>
                 </Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  sx={{ minWidth: 120 }}
-                >
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setCreateRegistryOpen(true)}
+                    sx={{ minWidth: 140 }}
+                  >
+                    Create Registry
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    sx={{ minWidth: 120 }}
+                  >
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </Box>
               </Box>
 
             <Grid container spacing={3}>
@@ -556,6 +609,14 @@ const RegistryDashboard: React.FC = () => {
           manifest={manifest}
         />
       )}
+
+      {/* Create Registry Dialog */}
+      <CreateRegistryDialog
+        open={createRegistryOpen}
+        onClose={() => setCreateRegistryOpen(false)}
+        currentNamespace={currentNamespace}
+        onCreate={handleCreateRegistry}
+      />
     </Box>
   );
 };
@@ -707,7 +768,7 @@ const RegistryDetailPage: React.FC = () => {
     }
   };
 
-  const loadData = async (isRefresh = false) => {
+  const loadData = useCallback(async (isRefresh = false) => {
     if (!registryId) {
       setError('Registry ID is required');
       if (!isRefresh) {setLoading(false);}
@@ -755,11 +816,11 @@ const RegistryDetailPage: React.FC = () => {
         setLoading(false);
       }
     }
-  };
+  }, [registryId]);
 
   useEffect(() => {
     loadData();
-  }, [registryId]);
+  }, [registryId, loadData]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
