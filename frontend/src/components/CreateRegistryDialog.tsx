@@ -12,11 +12,9 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Tooltip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { GeneralTab } from './CreateRegistryTabs/GeneralTab';
 import { DataSourcesTab } from './CreateRegistryTabs/DataSourcesTab';
@@ -118,7 +116,6 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState(0);
   const [showManifest, setShowManifest] = useState(false);
-  const [generatedManifest, setGeneratedManifest] = useState('');
   const [generatedManifestObject, setGeneratedManifestObject] = useState<object | null>(null);
 
   // Reset form when dialog opens/closes
@@ -141,7 +138,6 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
       setError(null);
       setCurrentTab(0);
       setShowManifest(false);
-      setGeneratedManifest('');
       setGeneratedManifestObject(null);
     }
   }, [open, currentNamespace]);
@@ -174,14 +170,10 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
   const handlePreviewManifest = () => {
     const manifestString = generateManifest();
     const manifestObject = JSON.parse(manifestString);
-    setGeneratedManifest(manifestString);
     setGeneratedManifestObject(manifestObject);
     setShowManifest(true);
   };
 
-  const copyManifestToClipboard = () => {
-    navigator.clipboard.writeText(generatedManifest);
-  };
 
   const cleanFormDataForSubmission = (data: CreateMCPRegistryRequest): CreateMCPRegistryRequest => {
     const cleaned: CreateMCPRegistryRequest = {
@@ -384,13 +376,8 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
           </Box>
         ) : (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, px: 2, pt: 2 }}>
+            <Box sx={{ mb: 2, px: 2, pt: 2 }}>
               <Typography variant="h6">Generated Manifest</Typography>
-              <Tooltip title="Copy to clipboard">
-                <IconButton onClick={copyManifestToClipboard}>
-                  <CopyIcon />
-                </IconButton>
-              </Tooltip>
             </Box>
             {generatedManifestObject && (
               <ManifestViewer

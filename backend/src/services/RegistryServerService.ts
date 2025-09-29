@@ -395,15 +395,16 @@ export class RegistryServerService {
       // Fetch all MCPServer resources from the namespace
       const allMCPServers = await k8sClient.getAllMCPServers(targetNamespace);
 
-      // Filter for deployed servers (those that have registry labels - opposite of orphaned)
+      // Filter for deployed servers that belong to the specific registry
       const deployedMCPServers = allMCPServers.filter((server: any) => {
         const labels = server.metadata?.labels || {};
-        const hasRegistryName = labels['toolhive.stacklok.io/registry-name'];
+        const registryName = labels['toolhive.stacklok.io/registry-name'];
         const hasRegistryNamespace = labels['toolhive.stacklok.io/registry-namespace'];
         const hasServerName = labels['toolhive.stacklok.io/server-name'];
 
-        // Server is deployed if it has all required registry labels
-        return hasRegistryName && hasRegistryNamespace && hasServerName;
+        // Server is deployed and belongs to this registry if it has all required registry labels
+        // and the registry-name matches the requested registryId
+        return registryName && hasRegistryNamespace && hasServerName && registryName === registryId;
       });
 
       // Transform MCPServer resources to our RegistryServer format

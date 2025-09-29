@@ -203,22 +203,79 @@ export class GitValidationService {
   }
 
   /**
-   * Get file content from a Git repository (simplified implementation)
-   * Note: This is a placeholder implementation that doesn't make external API calls
-   * In a real implementation, this would fetch content from GitHub/GitLab API
+   * Get file content from a Git repository using raw URLs
    */
   async getFileContent(repositoryUrl: string, filePath: string, branch: string = 'main'): Promise<string | null> {
     console.log(`Fetching file content from ${repositoryUrl}:${branch}/${filePath}`);
 
-    // This is a placeholder implementation that returns null
-    // In a real implementation, this would:
-    // 1. Parse the repository URL to determine the provider (GitHub, GitLab, etc.)
-    // 2. Use the appropriate API to fetch the file content
-    // 3. Handle authentication if required
-    // 4. Return the raw file content
+    try {
+      const rawUrl = this.constructRawUrl(repositoryUrl, filePath, branch);
+      if (!rawUrl) {
+        console.warn(`Could not construct raw URL for ${repositoryUrl}`);
+        return null;
+      }
 
-    console.warn(`getFileContent is not fully implemented - returning null for ${filePath}`);
-    return null;
+      console.log(`Fetching content from raw URL: ${rawUrl}`);
+
+      const response = await fetch(rawUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/vnd.github.v3.raw',
+          'User-Agent': 'ToolHive-Registry-UI'
+        },
+        // Set a reasonable timeout
+        signal: AbortSignal.timeout(10000) // 10 seconds
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch file content: HTTP ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const content = await response.text();
+      console.log(`Successfully fetched ${content.length} characters from ${filePath}`);
+      return content;
+    } catch (error) {
+      console.error(`Error fetching file content:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Construct raw URL for fetching file content from Git hosting services
+   */
+  private constructRawUrl(repositoryUrl: string, filePath: string, branch: string): string | null {
+    try {
+      const parsedUrl = new URL(repositoryUrl);
+
+      // Remove .git suffix if present
+      let pathname = parsedUrl.pathname;
+      if (pathname.endsWith('.git')) {
+        pathname = pathname.slice(0, -4);
+      }
+
+      // Handle different Git hosting providers
+      if (parsedUrl.hostname.includes('github.com')) {
+        // GitHub raw URL format: https://raw.githubusercontent.com/owner/repo/branch/path
+        const pathParts = pathname.split('/').filter(p => p.length > 0);
+        if (pathParts.length >= 2) {
+          const [owner, repo] = pathParts;
+          return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
+        }
+      } else if (parsedUrl.hostname.includes('gitlab.com')) {
+        // GitLab raw URL format: https://gitlab.com/owner/repo/-/raw/branch/path
+        return `https://gitlab.com${pathname}/-/raw/${branch}/${filePath}`;
+      } else if (parsedUrl.hostname.includes('bitbucket.org')) {
+        // Bitbucket raw URL format: https://bitbucket.org/owner/repo/raw/branch/path
+        return `https://bitbucket.org${pathname}/raw/${branch}/${filePath}`;
+      }
+
+      console.warn(`Unsupported Git hosting service: ${parsedUrl.hostname}`);
+      return null;
+    } catch (error) {
+      console.error('Error constructing raw URL:', error);
+      return null;
+    }
   }
 
   /**

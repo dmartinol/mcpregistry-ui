@@ -402,7 +402,10 @@ export const DataFilteringTab: React.FC<DataFilteringTabProps> = ({
 
             {tagsError && (
               <Alert severity="warning" sx={{ mb: 3 }}>
-                Could not load tags from data source: {tagsError}. You can still enter tag names manually.
+                {formData.source.type === 'git' ?
+                  'Could not load tags from Git repository. This may be due to network connectivity, repository access, or file format. You can still enter tag names manually.' :
+                  `Could not load tags from data source: ${tagsError}. You can still enter tag names manually.`
+                }
               </Alert>
             )}
 

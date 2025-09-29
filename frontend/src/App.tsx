@@ -578,11 +578,11 @@ const RegistryDashboard: React.FC = () => {
                         </Tooltip>
 
                         {/* Last Sync Badge */}
-                        <Tooltip title={`Last sync: ${registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synchronized'}`}>
+                        <Tooltip title={`Last sync: ${registry.syncStatus?.lastSyncTime ? new Date(registry.syncStatus.lastSyncTime).toLocaleString() : registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synchronized'}`}>
                           <Chip
-                            label={registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
+                            label={registry.syncStatus?.lastSyncTime ? new Date(registry.syncStatus.lastSyncTime).toLocaleString() : registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
                             size="small"
-                            color={registry.lastSyncAt ? 'info' : 'warning'}
+                            color={registry.syncStatus?.lastSyncTime || registry.lastSyncAt ? 'info' : 'warning'}
                             variant="outlined"
                           />
                         </Tooltip>
