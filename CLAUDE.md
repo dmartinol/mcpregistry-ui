@@ -4,6 +4,20 @@
 
 This document serves as the single source of truth for AI assistants working on the ToolHive Registry Management Application. It consolidates all development principles, technical specifications, and implementation guidelines.
 
+## 🚨 CRITICAL COMPLETION REQUIREMENTS 🚨
+
+**MANDATORY QUALITY GATES - MUST BE VERIFIED AFTER EVERY TASK/REQUEST:**
+
+1. **✅ TypeScript Compilation**: `npm run typecheck` MUST pass without errors in both frontend and backend
+2. **✅ ESLint Validation**: `npm run lint` MUST pass without errors in both frontend and backend
+3. **✅ Code Formatting**: All code MUST follow established formatting standards
+4. **✅ No Console Errors**: Browser console MUST be free of JavaScript errors
+5. **✅ Functional Verification**: All modified functionality MUST be manually tested
+
+**⚠️ FAILURE TO VERIFY THESE REQUIREMENTS CONSTITUTES INCOMPLETE WORK ⚠️**
+
+AI assistants MUST run these checks immediately after any code changes and fix all issues before considering a task complete. No exceptions.
+
 ## Project Overview
 
 The ToolHive Registry Management Application is a comprehensive web-based interface for managing ToolHive registries in Kubernetes clusters. It provides capabilities for registry lifecycle management, server discovery and deployment, instance monitoring, and multi-tenant access control through a modern React-based UI integrated with Kubernetes APIs.
@@ -229,7 +243,8 @@ interface Server {
 1. Write failing tests for new functionality
 2. Implement minimum code to pass tests
 3. Refactor while maintaining test coverage
-4. Ensure >90% test coverage before merge
+4. **MANDATORY**: Run all quality gates before considering task complete
+5. Ensure >90% test coverage before merge
 
 ### Code Review Process
 1. All changes require pull request review
@@ -238,12 +253,16 @@ interface Server {
 4. Performance impact assessment
 5. Security review for sensitive changes
 
-### Quality Gates
-- ESLint and Prettier formatting compliance
-- TypeScript compilation without errors
+### Quality Gates (MANDATORY AFTER EVERY CHANGE)
+- **CRITICAL**: ESLint and Prettier formatting compliance (`npm run lint`)
+- **CRITICAL**: TypeScript compilation without errors (`npm run typecheck`)
+- **CRITICAL**: No console errors in browser
+- **CRITICAL**: Manual functional verification of changes
 - Test coverage >90% for new code
 - Performance benchmarks within constitutional limits
 - Accessibility compliance verification
+
+**⚠️ ALL CRITICAL QUALITY GATES MUST PASS BEFORE TASK COMPLETION ⚠️**
 
 ## Integration Patterns
 
