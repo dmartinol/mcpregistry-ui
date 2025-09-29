@@ -70,12 +70,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const registry = await registryService.createRegistry(value!);
     res.status(201).json(registry);
   } catch (error) {
-    console.error('=== ERROR in POST /api/v1/registries ===');
-    console.error('Error type:', typeof error);
-    console.error('Error constructor:', error?.constructor?.name);
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
-    console.error('Full error object:', error);
+    // Only log detailed errors in non-test environments to reduce test noise
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('=== ERROR in POST /api/v1/registries ===');
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+      console.error('Full error object:', error);
+    }
     if (error instanceof Error && error.message.includes('already exists')) {
       res.status(409).json({ error: error.message });
     } else {
@@ -414,6 +417,8 @@ router.post('/:registryId/servers/:serverName/deploy', async (req: Request, res:
     const deploymentConfig = {
       ...value,
       serverName: req.params.serverName,
+      // Filter out environment variables with empty values
+      environmentVariables: value.environmentVariables.filter((env: any) => env.value.trim()),
     };
 
     const deployedServer = await kubernetesClient.deployMCPServer(deploymentConfig);

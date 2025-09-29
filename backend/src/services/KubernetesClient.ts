@@ -9,6 +9,7 @@ export interface MCPRegistry {
     namespace: string;
     creationTimestamp: string;
     uid: string;
+    deletionTimestamp?: string;
     [key: string]: any;
   };
   spec: {
@@ -495,7 +496,13 @@ export class KubernetesClient {
 
   // Helper method to convert MCPRegistry to our Registry model
   async mcpRegistryToRegistry(mcpRegistry: MCPRegistry): Promise<Registry> {
-    const status = this.mapMCPPhaseToStatus(mcpRegistry.status?.phase);
+    // Check if resource is being deleted (Terminating state)
+    const isTerminating = !!mcpRegistry.metadata.deletionTimestamp;
+
+    // Prioritize apiStatus.phase if available, otherwise use overall phase
+    const effectivePhase = isTerminating ? 'Terminating' :
+      ((mcpRegistry.status as any)?.apiStatus?.phase || mcpRegistry.status?.phase);
+    const status = this.mapMCPPhaseToStatus(effectivePhase);
     const sourceInfo = this.extractSourceInfo(mcpRegistry);
     const syncStatus = this.extractSyncStatus(mcpRegistry);
 
@@ -598,6 +605,8 @@ export class KubernetesClient {
         return 'syncing';
       case 'Error':
         return 'error';
+      case 'Terminating':
+        return 'terminating';
       case 'Pending':
       default:
         return 'inactive';
@@ -890,16 +899,19 @@ export class KubernetesClient {
 
     const targetNamespace = namespace || this.namespace;
 
+    console.log(`🔧 [K8S] Deleting MCPServer: ${name} in namespace: ${targetNamespace}`);
     try {
-      await this.customApi.deleteNamespacedCustomObject(
+      const response = await this.customApi.deleteNamespacedCustomObject(
         'toolhive.stacklok.dev',
         'v1alpha1',
         targetNamespace,
         'mcpservers',
         name
       );
+      console.log(`🎯 [K8S] Delete response status: ${response.response?.statusCode}`);
+      console.log(`🎯 [K8S] Delete response body:`, JSON.stringify(response.body, null, 2));
     } catch (error) {
-      console.error('Error deleting MCPServer:', error);
+      console.error('❌ [K8S] Error deleting MCPServer:', error);
       if ((error as any).statusCode === 404) {
         throw new Error(`MCPServer ${name} not found`);
       }

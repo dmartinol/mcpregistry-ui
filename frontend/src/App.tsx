@@ -174,6 +174,11 @@ const RegistryDashboard: React.FC = () => {
   // Create Registry dialog state
   const [createRegistryOpen, setCreateRegistryOpen] = useState(false);
 
+  // Delete Registry confirmation state
+  const [deleteRegistryConfirmOpen, setDeleteRegistryConfirmOpen] = useState(false);
+  const [registryToDelete, setRegistryToDelete] = useState<Registry | null>(null);
+  const [deletingRegistry, setDeletingRegistry] = useState(false);
+
   useEffect(() => {
     const loadRegistries = async () => {
       try {
@@ -203,6 +208,8 @@ const RegistryDashboard: React.FC = () => {
       case 'error':
         return 'error';
       case 'syncing':
+        return 'warning';
+      case 'terminating':
         return 'warning';
       default:
         return 'info';
@@ -338,6 +345,83 @@ const RegistryDashboard: React.FC = () => {
       console.error('Error creating MCPRegistry:', error);
       throw error; // Re-throw so the dialog can handle the error display
     }
+  };
+
+  // Helper function to poll for resource deletion completion (RegistryDashboard)
+  const pollForDeletion = async (resourceType: 'registry' | 'server', resourceId: string, _namespace?: string): Promise<void> => {
+    const maxAttempts = 20; // 10 seconds with 500ms intervals
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        let response;
+
+        if (resourceType === 'registry') {
+          response = await fetch(`/api/v1/registries/${resourceId}`);
+        } else {
+          // This polling function in RegistryDashboard only handles registry deletion
+          // Server deletion polling is handled in RegistryDetailPage component
+          throw new Error('Server polling not supported in RegistryDashboard component');
+        }
+
+        if (response.status === 404) {
+          // Resource is fully deleted
+          console.log(`${resourceType} ${resourceId} successfully deleted`);
+          window.location.reload();
+          return;
+        } else if (response.ok) {
+          const resource = await response.json();
+
+          // Check if resource is in terminating state
+          if (resource.status === 'terminating' || resource.status === 'Terminating' || resource.metadata?.deletionTimestamp) {
+            console.log(`${resourceType} ${resourceId} is terminating, continuing to poll...`);
+          } else {
+            console.log(`${resourceType} ${resourceId} deletion may have failed, refreshing anyway...`);
+            window.location.reload();
+            return;
+          }
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Error polling for ${resourceType} deletion:`, error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    // Timeout reached, refresh anyway
+    console.log(`Polling timeout reached for ${resourceType} ${resourceId}, refreshing page...`);
+    window.location.reload();
+  };
+
+  const handleDeleteRegistry = async () => {
+    if (!registryToDelete) return;
+
+    setDeletingRegistry(true);
+    try {
+      await api.deleteMCPRegistry(registryToDelete.id);
+
+      // Poll for deletion completion
+      await pollForDeletion('registry', registryToDelete.id);
+    } catch (error) {
+      console.error('Error deleting registry:', error);
+      // Still close the dialog and reset state on error
+      setDeleteRegistryConfirmOpen(false);
+      setRegistryToDelete(null);
+      setDeletingRegistry(false);
+      // Could add error toast/notification here
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteRegistryConfirmOpen(false);
+    setRegistryToDelete(null);
   };
 
   return (
@@ -549,36 +633,53 @@ const RegistryDashboard: React.FC = () => {
                         Updated: {formatDate(registry.updatedAt)}
                       </Typography>
 
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                        <Tooltip title="Show Registry Manifest">
-                          <IconButton
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
                             size="small"
+                            variant="outlined"
+                            startIcon={<SyncIcon />}
+                            onClick={(e) => handleForceSync(registry.id, e)}
+                            sx={{ minWidth: 120 }}
+                          >
+                            Force Sync
+                          </Button>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <Tooltip title="Preview Registry Manifest">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShowRegistryManifest(registry.id);
+                              }}
+                              disabled={loadingManifest}
+                              sx={{
+                                color: 'white',
+                                backgroundColor: 'primary.main',
+                                '&:hover': {
+                                  backgroundColor: 'primary.dark',
+                                  color: 'white',
+                                },
+                              }}
+                            >
+                              <ManifestIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleShowRegistryManifest(registry.id);
-                            }}
-                            disabled={loadingManifest}
-                            sx={{
-                              color: 'white',
-                              backgroundColor: 'primary.main',
-                              '&:hover': {
-                                backgroundColor: 'primary.dark',
-                                color: 'white',
-                              },
+                              setRegistryToDelete(registry);
+                              setDeleteRegistryConfirmOpen(true);
                             }}
                           >
-                            <ManifestIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<SyncIcon />}
-                          onClick={(e) => handleForceSync(registry.id, e)}
-                          sx={{ minWidth: 120 }}
-                        >
-                          Force Sync
-                        </Button>
+                            Delete
+                          </Button>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -619,6 +720,43 @@ const RegistryDashboard: React.FC = () => {
         currentNamespace={currentNamespace}
         onCreate={handleCreateRegistry}
       />
+
+      {/* Delete Registry Confirmation Dialog */}
+      <Dialog
+        open={deleteRegistryConfirmOpen}
+        onClose={handleDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Confirm Registry Deletion
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete the registry <strong>{registryToDelete?.name}</strong>?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            This action is equivalent to running: <code>kubectl delete mcpregistry {registryToDelete?.id}</code>
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deletingRegistry}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteRegistry}
+            color="error"
+            variant="contained"
+            disabled={deletingRegistry}
+            startIcon={deletingRegistry ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deletingRegistry ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -633,7 +771,21 @@ const RegistryDetailPage: React.FC = () => {
   const [serversLoading, setServersLoading] = useState(false);
   const [deployedServersLoading, setDeployedServersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tabValue, setTabValue] = useState(0);
+
+  // Initialize tab value from URL parameter, defaulting to 0
+  const [tabValue, setTabValue] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    return tab ? parseInt(tab, 10) : 0;
+  });
+
+  // Helper function to reload page while preserving current tab state
+  const reloadWithCurrentTab = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabValue.toString());
+    window.location.href = url.toString();
+  };
+
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [selectedRegistry, setSelectedRegistry] = useState<Registry | null>(null);
@@ -658,6 +810,59 @@ const RegistryDetailPage: React.FC = () => {
   const [manifestTitle, setManifestTitle] = useState('');
   const [loadingManifest, setLoadingManifest] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Helper function to poll for resource deletion completion
+  const pollForDeletion = async (resourceType: 'registry' | 'server', resourceId: string, _namespace?: string): Promise<void> => {
+    const maxAttempts = 20; // 10 seconds with 500ms intervals
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        let response;
+
+        if (resourceType === 'registry') {
+          response = await fetch(`/api/v1/registries/${resourceId}`);
+        } else {
+          // For deployed servers, use the deployed server endpoint
+          // We need both registry ID and server name for deployed servers
+          response = await fetch(`/api/v1/registries/${registryId}/servers/deployed/${resourceId}`);
+        }
+
+        if (response.status === 404) {
+          // Resource is fully deleted
+          console.log(`${resourceType} ${resourceId} successfully deleted`);
+          reloadWithCurrentTab();
+          return;
+        } else if (response.ok) {
+          const resource = await response.json();
+
+          // Check if resource is in terminating state
+          if (resource.status === 'terminating' || resource.status === 'Terminating' || resource.metadata?.deletionTimestamp) {
+            console.log(`${resourceType} ${resourceId} is terminating, continuing to poll...`);
+          } else {
+            console.log(`${resourceType} ${resourceId} deletion may have failed, refreshing anyway...`);
+            reloadWithCurrentTab();
+            return;
+          }
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Error polling for ${resourceType} deletion:`, error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    // Timeout reached, refresh anyway
+    console.log(`Polling timeout reached for ${resourceType} ${resourceId}, refreshing page...`);
+    reloadWithCurrentTab();
+  };
 
   // Helper functions for source click handling
   const parseConfigMapLocation = (location: string) => {
@@ -826,6 +1031,10 @@ const RegistryDetailPage: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    // Update URL parameter to persist tab state across page refreshes
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', newValue.toString());
+    window.history.replaceState({}, '', url.toString());
   };
 
   const handleServerDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -956,7 +1165,10 @@ const RegistryDetailPage: React.FC = () => {
       setDeployDialogOpen(false);
       handleDialogClose(); // This closes the server popup
 
-      // Optionally refresh deployed servers or show success message
+      // Add a delay to ensure the deployment is processed, then refresh the page
+      setTimeout(() => {
+        reloadWithCurrentTab();
+      }, 1000);
     } catch (error) {
       throw error; // Let the dialog handle the error
     }
@@ -970,24 +1182,15 @@ const RegistryDetailPage: React.FC = () => {
       // Call the delete API endpoint with namespace
       await api.deleteDeployedServer(serverToDelete.name, serverToDelete.namespace);
 
-      // Refresh the deployed servers list
-      const deployedServersResponse = await fetch(`/api/v1/registries/${registryId}/deployed-servers`);
-      if (deployedServersResponse.ok) {
-        const deployedServersData = await deployedServersResponse.json();
-        setDeployedServers(deployedServersData.servers);
-      }
-
-      // Close dialog and reset state
-      setDeleteConfirmOpen(false);
-      setServerToDelete(null);
+      // Poll for deletion completion
+      await pollForDeletion('server', serverToDelete.name, serverToDelete.namespace);
     } catch (error) {
       console.error('Error deleting server:', error);
       // Still close the dialog and reset state on error
       setDeleteConfirmOpen(false);
       setServerToDelete(null);
-      // Could add error toast/notification here
-    } finally {
       setDeleting(false);
+      // Could add error toast/notification here
     }
   };
 
@@ -2049,7 +2252,7 @@ const RegistryDetailPage: React.FC = () => {
             transport: selectedServer.transport
           } : null}
           registryId={selectedRegistry?.id || ''}
-          registryName={selectedRegistry?.name || ''}
+          registryName={selectedRegistry?.id || ''}
           registryNamespace={selectedRegistry?.metadata?.namespace || 'toolhive-system'}
           onDeploy={handleDeploy}
         />

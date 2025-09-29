@@ -15,7 +15,6 @@ import {
   IconButton,
   Chip,
   Alert,
-  Paper,
   Tooltip,
   CircularProgress,
   Tabs,
@@ -28,6 +27,7 @@ import {
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { getDisplayName } from '../utils/displayNames';
+import { ManifestViewer } from './ManifestViewer';
 
 interface EnvironmentVariable {
   name: string;
@@ -151,6 +151,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showManifest, setShowManifest] = useState(false);
   const [generatedManifest, setGeneratedManifest] = useState('');
+  const [generatedManifestObject, setGeneratedManifestObject] = useState<object | null>(null);
   const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
@@ -236,11 +237,13 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         }),
         permissionProfile: config.permissionProfile,
         resources: config.resources,
-        ...(config.environmentVariables.length > 0 && {
-          env: config.environmentVariables.map(env => ({
-            name: env.name,
-            value: env.value,
-          })),
+        ...(config.environmentVariables.filter(env => env.value.trim()).length > 0 && {
+          env: config.environmentVariables
+            .filter(env => env.value.trim()) // Only include env vars with non-empty values
+            .map(env => ({
+              name: env.name,
+              value: env.value,
+            })),
         }),
       },
     };
@@ -249,8 +252,10 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   };
 
   const handlePreviewManifest = () => {
-    const manifest = generateManifest();
-    setGeneratedManifest(manifest);
+    const manifestString = generateManifest();
+    const manifestObject = JSON.parse(manifestString);
+    setGeneratedManifest(manifestString);
+    setGeneratedManifestObject(manifestObject);
     setShowManifest(true);
   };
 
@@ -269,7 +274,12 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
     setError(null);
 
     try {
-      await onDeploy(config);
+      // Filter out empty environment variables before deployment
+      const deploymentConfig = {
+        ...config,
+        environmentVariables: config.environmentVariables.filter(env => env.value.trim())
+      };
+      await onDeploy(deploymentConfig);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to deploy server');
@@ -599,11 +609,15 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                 </IconButton>
               </Tooltip>
             </Box>
-            <Paper variant="outlined" sx={{ p: 2, backgroundColor: 'grey.50' }}>
-              <pre style={{ margin: 0, fontSize: '0.875rem', overflow: 'auto' }}>
-                {generatedManifest}
-              </pre>
-            </Paper>
+            {generatedManifestObject && (
+              <ManifestViewer
+                open={true}
+                onClose={() => {}} // Don't close, just display inline
+                title=""
+                manifest={generatedManifestObject}
+                inline={true} // Add inline prop to display without dialog
+              />
+            )}
           </Box>
         )}
       </DialogContent>

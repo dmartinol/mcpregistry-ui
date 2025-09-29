@@ -80,7 +80,7 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
     try {
       await onConnect(
         server.name,
-        registry.name,
+        registry.id,
         registry.namespace || 'toolhive-system',
         serverNameInRegistry.trim(),
         server.namespace

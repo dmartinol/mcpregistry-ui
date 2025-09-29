@@ -37,10 +37,8 @@ const syncIntervalSchema = Joi.string()
 // Git URL validation
 const gitUrlSchema = Joi.string()
   .uri({ scheme: ['https'] })
-  .pattern(/^https:\/\/(github\.com|gitlab\.com|bitbucket\.org)\/.+\.git$/)
   .messages({
-    'string.uri': 'Git URL must be a valid HTTPS URL',
-    'string.pattern.base': 'Git URL must be from GitHub, GitLab, or Bitbucket and end with .git'
+    'string.uri': 'Git URL must be a valid HTTPS URL'
   });
 
 // Branch name validation

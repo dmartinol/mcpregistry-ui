@@ -5,7 +5,7 @@ export interface Registry {
   name: string;
   url: string;
   description?: string;
-  status: 'active' | 'inactive' | 'error' | 'syncing';
+  status: 'active' | 'inactive' | 'error' | 'syncing' | 'terminating';
   serverCount: number;
   lastSyncAt?: Date;
   createdAt: Date;

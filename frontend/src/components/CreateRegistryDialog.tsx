@@ -12,14 +12,17 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Tooltip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
+  ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { GeneralTab } from './CreateRegistryTabs/GeneralTab';
 import { DataSourcesTab } from './CreateRegistryTabs/DataSourcesTab';
 import { DataFilteringTab } from './CreateRegistryTabs/DataFilteringTab';
 import { SyncPolicyTab } from './CreateRegistryTabs/SyncPolicyTab';
+import { ManifestViewer } from './ManifestViewer';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -114,6 +117,9 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState(0);
+  const [showManifest, setShowManifest] = useState(false);
+  const [generatedManifest, setGeneratedManifest] = useState('');
+  const [generatedManifestObject, setGeneratedManifestObject] = useState<object | null>(null);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -134,11 +140,73 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
       });
       setError(null);
       setCurrentTab(0);
+      setShowManifest(false);
+      setGeneratedManifest('');
+      setGeneratedManifestObject(null);
     }
   }, [open, currentNamespace]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
+  };
+
+  const generateManifest = () => {
+    const cleanedData = cleanFormDataForSubmission(formData);
+    const manifest = {
+      apiVersion: 'toolhive.stacklok.dev/v1alpha1',
+      kind: 'MCPRegistry',
+      metadata: {
+        name: cleanedData.name,
+        namespace: cleanedData.namespace,
+      },
+      spec: {
+        displayName: cleanedData.displayName,
+        ...(cleanedData.enforceServers && { enforceServers: cleanedData.enforceServers }),
+        source: cleanedData.source,
+        ...(cleanedData.syncPolicy && { syncPolicy: cleanedData.syncPolicy }),
+        ...(cleanedData.filter && { filter: cleanedData.filter }),
+      },
+    };
+
+    return JSON.stringify(manifest, null, 2);
+  };
+
+  const handlePreviewManifest = () => {
+    const manifestString = generateManifest();
+    const manifestObject = JSON.parse(manifestString);
+    setGeneratedManifest(manifestString);
+    setGeneratedManifestObject(manifestObject);
+    setShowManifest(true);
+  };
+
+  const copyManifestToClipboard = () => {
+    navigator.clipboard.writeText(generatedManifest);
+  };
+
+  const cleanFormDataForSubmission = (data: CreateMCPRegistryRequest): CreateMCPRegistryRequest => {
+    const cleaned: CreateMCPRegistryRequest = {
+      ...data,
+      source: {
+        type: data.source.type,
+        format: data.source.format,
+        // Only include the relevant sub-object based on type
+        ...(data.source.type === 'configmap' && data.source.configmap && {
+          configmap: data.source.configmap
+        }),
+        ...(data.source.type === 'git' && data.source.git && {
+          git: data.source.git
+        })
+      }
+    };
+
+    // Remove undefined values to avoid sending them
+    if (cleaned.source.type === 'configmap') {
+      delete (cleaned.source as any).git;
+    } else if (cleaned.source.type === 'git') {
+      delete (cleaned.source as any).configmap;
+    }
+
+    return cleaned;
   };
 
   const handleCreate = async () => {
@@ -174,7 +242,8 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
     setError(null);
 
     try {
-      await onCreate(formData);
+      const cleanedData = cleanFormDataForSubmission(formData);
+      await onCreate(cleanedData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create registry');
@@ -201,15 +270,17 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
         source: updates.source ? {
           ...prev.source,
           ...updates.source,
-          // Ensure nested objects are properly merged
-          configmap: updates.source.configmap ? {
-            ...(prev.source.configmap || {}),
-            ...updates.source.configmap,
-          } : prev.source.configmap,
-          git: updates.source.git ? {
-            ...(prev.source.git || {}),
-            ...updates.source.git,
-          } : prev.source.git,
+          // Only keep the relevant sub-object based on type
+          configmap: updates.source.type === 'configmap' ?
+            (updates.source.configmap ? {
+              ...(prev.source.configmap || {}),
+              ...updates.source.configmap,
+            } : prev.source.configmap) : undefined,
+          git: updates.source.type === 'git' ?
+            (updates.source.git ? {
+              ...(prev.source.git || {}),
+              ...updates.source.git,
+            } : prev.source.git) : undefined,
         } : prev.source,
         filter: updates.filter ? {
           ...(prev.filter || {}),
@@ -253,77 +324,120 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
           </Alert>
         )}
 
-        <Box>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs
-              value={currentTab}
-              onChange={handleTabChange}
-              aria-label="create registry tabs"
-              sx={{ px: 2 }}
-            >
-              <Tab
-                label="General"
-                {...a11yProps(0)}
-              />
-              <Tab
-                label="Data Sources"
-                {...a11yProps(1)}
-              />
-              <Tab
-                label="Data Filtering"
-                {...a11yProps(2)}
-              />
-              <Tab
-                label="Sync Policy"
-                {...a11yProps(3)}
-              />
-            </Tabs>
+        {!showManifest ? (
+          <Box>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs
+                value={currentTab}
+                onChange={handleTabChange}
+                aria-label="create registry tabs"
+                sx={{ px: 2 }}
+              >
+                <Tab
+                  label="General"
+                  {...a11yProps(0)}
+                />
+                <Tab
+                  label="Data Sources"
+                  {...a11yProps(1)}
+                />
+                <Tab
+                  label="Data Filtering"
+                  {...a11yProps(2)}
+                />
+                <Tab
+                  label="Sync Policy"
+                  {...a11yProps(3)}
+                />
+              </Tabs>
+            </Box>
+
+            <Box sx={{ px: 2, pb: 2 }}>
+              <TabPanel value={currentTab} index={0}>
+                <GeneralTab
+                  formData={formData}
+                  onUpdate={updateFormData}
+                />
+              </TabPanel>
+
+              <TabPanel value={currentTab} index={1}>
+                <DataSourcesTab
+                  formData={formData}
+                  onUpdate={updateFormData}
+                />
+              </TabPanel>
+
+              <TabPanel value={currentTab} index={2}>
+                <DataFilteringTab
+                  formData={formData}
+                  onUpdate={updateFormData}
+                />
+              </TabPanel>
+
+              <TabPanel value={currentTab} index={3}>
+                <SyncPolicyTab
+                  formData={formData}
+                  onUpdate={updateFormData}
+                />
+              </TabPanel>
+            </Box>
           </Box>
-
-          <Box sx={{ px: 2, pb: 2 }}>
-            <TabPanel value={currentTab} index={0}>
-              <GeneralTab
-                formData={formData}
-                onUpdate={updateFormData}
+        ) : (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, px: 2, pt: 2 }}>
+              <Typography variant="h6">Generated Manifest</Typography>
+              <Tooltip title="Copy to clipboard">
+                <IconButton onClick={copyManifestToClipboard}>
+                  <CopyIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            {generatedManifestObject && (
+              <ManifestViewer
+                open={true}
+                onClose={() => {}} // Don't close, just display inline
+                title=""
+                manifest={generatedManifestObject}
+                inline={true} // Add inline prop to display without dialog
               />
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={1}>
-              <DataSourcesTab
-                formData={formData}
-                onUpdate={updateFormData}
-              />
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={2}>
-              <DataFilteringTab
-                formData={formData}
-                onUpdate={updateFormData}
-              />
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={3}>
-              <SyncPolicyTab
-                formData={formData}
-                onUpdate={updateFormData}
-              />
-            </TabPanel>
+            )}
           </Box>
-        </Box>
+        )}
       </DialogContent>
 
       <DialogActions>
         <Button onClick={handleClose} disabled={creating}>
           Cancel
         </Button>
-        <Button
-          onClick={handleCreate}
-          variant="contained"
-          disabled={creating}
-          startIcon={creating ? <CircularProgress size={20} /> : null}
-        >
-          {creating ? 'Creating...' : 'Create Registry'}
-        </Button>
+        {!showManifest ? (
+          <>
+            <Button onClick={handlePreviewManifest} variant="outlined">
+              Preview Manifest
+            </Button>
+            <Button
+              onClick={handleCreate}
+              variant="contained"
+              disabled={creating}
+              startIcon={creating ? <CircularProgress size={20} /> : null}
+            >
+              {creating ? 'Creating...' : 'Create Registry'}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button onClick={() => setShowManifest(false)} variant="outlined">
+              Back to Configuration
+            </Button>
+            <Button
+              onClick={handleCreate}
+              variant="contained"
+              disabled={creating}
+              startIcon={creating ? <CircularProgress size={20} /> : null}
+            >
+              {creating ? 'Creating...' : 'Create Registry'}
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );

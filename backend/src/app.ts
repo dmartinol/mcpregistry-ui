@@ -43,7 +43,9 @@ serversRouter.delete('/:serverId', async (req, res) => {
     // Use the namespace from query params, or default to toolhive-system
     const targetNamespace = (namespace as string) || 'toolhive-system';
 
+    console.log(`🗑️ [DELETE] Attempting to delete MCPServer: ${serverId} in namespace: ${targetNamespace}`);
     await kubernetesClient.deleteMCPServer(serverId, targetNamespace);
+    console.log(`✅ [DELETE] Successfully deleted MCPServer: ${serverId}`);
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting server:', error);

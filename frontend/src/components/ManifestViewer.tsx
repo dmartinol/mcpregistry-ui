@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
-  DialogContent,
   DialogActions,
   Button,
   Tabs,
@@ -226,6 +225,7 @@ export interface ManifestViewerProps {
   onClose: () => void;
   title: string;
   manifest: object;
+  inline?: boolean;
 }
 
 export const ManifestViewer: React.FC<ManifestViewerProps> = ({
@@ -233,6 +233,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
   onClose,
   title,
   manifest,
+  inline = false,
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [yamlFoldState, setYamlFoldState] = useState<FoldState>({});
@@ -316,32 +317,10 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
     });
   };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: { height: '80vh', maxHeight: '800px' }
-      }}
-    >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', pb: 1 }}>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {title} - Manifest
-        </Typography>
-        <Tooltip title="Close">
-          <IconButton
-            onClick={onClose}
-            size="small"
-            sx={{ ml: 1 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </Tooltip>
-      </DialogTitle>
-
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
+  // Render inline content without dialog wrapper
+  const renderContent = () => (
+    <>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: inline ? 0 : 3 }}>
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
@@ -360,7 +339,7 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
         </Tabs>
       </Box>
 
-      <DialogContent sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <TabPanel value={tabValue} index={0}>
           <Box sx={{ position: 'relative' }}>
             <Tooltip title="Copy YAML">
@@ -414,7 +393,44 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
             </CodeEditor>
           </Box>
         </TabPanel>
-      </DialogContent>
+      </Box>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
+        {renderContent()}
+      </Box>
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: { height: '80vh', maxHeight: '800px' }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', pb: 1 }}>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          {title} - Manifest
+        </Typography>
+        <Tooltip title="Close">
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Tooltip>
+      </DialogTitle>
+
+      {renderContent()}
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} variant="contained">

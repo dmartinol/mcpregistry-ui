@@ -215,6 +215,15 @@ async function fetchWithErrorHandling(url: string, options?: Record<string, any>
       throw new ApiError(response.status, errorData.error || `HTTP ${response.status}`);
     }
 
+    // Handle empty responses (like 204 No Content) that don't have JSON
+    const contentType = response.headers.get('content-type');
+    const hasContent = contentType && contentType.includes('application/json');
+
+    if (response.status === 204 || !hasContent) {
+      // For 204 No Content or non-JSON responses, return undefined
+      return undefined;
+    }
+
     return await response.json();
   } catch (error) {
     if (error instanceof ApiError) {

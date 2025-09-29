@@ -122,11 +122,13 @@ export class RegistryServerService {
       return serversWithCompleteData.map(server => this.validateServerData(server));
 
     } catch (error) {
-      console.error(`Failed to fetch from registry ${registryId}:`, error);
+      // Only log errors in non-test environments to reduce test noise
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`Failed to fetch from registry ${registryId}:`, error);
+      }
 
       // For test environments, provide empty response instead of throwing
       if (process.env.NODE_ENV === 'test' && registryId === 'mock-registry-system') {
-        console.log(`Returning empty test data for mock registry: ${registryId}`);
         return [];
       }
 
