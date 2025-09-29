@@ -16,6 +16,7 @@ import {
   Code as ManifestIcon,
 } from '@mui/icons-material';
 import { ManifestViewer } from './ManifestViewer';
+import { getDisplayName } from '../utils/displayNames';
 
 export interface OrphanedServer {
   name: string;
@@ -284,7 +285,7 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
         <ManifestViewer
           open={manifestViewerOpen}
           onClose={() => setManifestViewerOpen(false)}
-          title={`${server.name} Server`}
+          title={`${getDisplayName(server.name)} Server`}
           manifest={manifest}
         />
       )}

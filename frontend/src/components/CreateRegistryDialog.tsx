@@ -309,70 +309,73 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0 }}>
-        {error && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {error}
-          </Alert>
-        )}
+      {/* Fixed Error Alert Section */}
+      {error && (
+        <Alert severity="error" sx={{ mx: 2, mt: 2, mb: 0 }}>
+          {error}
+        </Alert>
+      )}
 
+      {/* Fixed Tabs Section */}
+      {!showManifest && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={currentTab}
+            onChange={handleTabChange}
+            aria-label="create registry tabs"
+            sx={{ px: 2 }}
+          >
+            <Tab
+              label="General"
+              {...a11yProps(0)}
+            />
+            <Tab
+              label="Data Sources"
+              {...a11yProps(1)}
+            />
+            <Tab
+              label="Data Filtering"
+              {...a11yProps(2)}
+            />
+            <Tab
+              label="Sync Policy"
+              {...a11yProps(3)}
+            />
+          </Tabs>
+        </Box>
+      )}
+
+      {/* Scrollable Content Section */}
+      <DialogContent sx={{ p: 0, overflow: 'auto' }}>
         {!showManifest ? (
-          <Box>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs
-                value={currentTab}
-                onChange={handleTabChange}
-                aria-label="create registry tabs"
-                sx={{ px: 2 }}
-              >
-                <Tab
-                  label="General"
-                  {...a11yProps(0)}
-                />
-                <Tab
-                  label="Data Sources"
-                  {...a11yProps(1)}
-                />
-                <Tab
-                  label="Data Filtering"
-                  {...a11yProps(2)}
-                />
-                <Tab
-                  label="Sync Policy"
-                  {...a11yProps(3)}
-                />
-              </Tabs>
-            </Box>
+          <Box sx={{ px: 2, pb: 2 }}>
+            <TabPanel value={currentTab} index={0}>
+              <GeneralTab
+                formData={formData}
+                onUpdate={updateFormData}
+              />
+            </TabPanel>
 
-            <Box sx={{ px: 2, pb: 2 }}>
-              <TabPanel value={currentTab} index={0}>
-                <GeneralTab
-                  formData={formData}
-                  onUpdate={updateFormData}
-                />
-              </TabPanel>
+            <TabPanel value={currentTab} index={1}>
+              <DataSourcesTab
+                formData={formData}
+                onUpdate={updateFormData}
+              />
+            </TabPanel>
 
-              <TabPanel value={currentTab} index={1}>
-                <DataSourcesTab
-                  formData={formData}
-                  onUpdate={updateFormData}
-                />
-              </TabPanel>
+            <TabPanel value={currentTab} index={2}>
+              <DataFilteringTab
+                formData={formData}
+                onUpdate={updateFormData}
+              />
+            </TabPanel>
 
-              <TabPanel value={currentTab} index={2}>
-                <DataFilteringTab
-                  formData={formData}
-                  onUpdate={updateFormData}
-                />
-              </TabPanel>
-
-              <TabPanel value={currentTab} index={3}>
-                <SyncPolicyTab
-                  formData={formData}
-                  onUpdate={updateFormData}
-                />
-              </TabPanel>
-            </Box>
+            <TabPanel value={currentTab} index={3}>
+              <SyncPolicyTab
+                formData={formData}
+                onUpdate={updateFormData}
+              />
+            </TabPanel>
           </Box>
         ) : (
           <Box>

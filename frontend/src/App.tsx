@@ -118,6 +118,7 @@ interface Server {
     stars?: number;
   };
   repository_url?: string;
+  logoUrl?: string;
 }
 
 interface ServersResponse {
@@ -1218,7 +1219,7 @@ const RegistryDetailPage: React.FC = () => {
     try {
       const manifestData = await api.getDeployedServerManifest(registryId!, server.name);
       setManifest(manifestData);
-      setManifestTitle(`${server.name} Server`);
+      setManifestTitle(`${getDisplayName(server.name)} Server`);
       setManifestViewerOpen(true);
     } catch (error) {
       console.error('Failed to load deployed server manifest:', error);
@@ -1548,19 +1549,51 @@ const RegistryDetailPage: React.FC = () => {
                 {filteredServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
-                      {/* Title */}
-                      <Typography
-                        variant="h6"
+                      {/* Title with Logo */}
+                      <Box
                         sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          mb: 1,
                           cursor: 'pointer',
-                          color: 'primary.main',
-                          '&:hover': { textDecoration: 'underline' },
-                          mb: 1
+                          '&:hover .server-title': { textDecoration: 'underline' }
                         }}
                         onClick={() => handleServerClick(server, false)}
                       >
-                        {getDisplayName(server.name)}
-                      </Typography>
+                        {server.logoUrl && (
+                          <Box
+                            component="img"
+                            src={server.logoUrl}
+                            alt={`${server.name} logo`}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 1,
+                              objectFit: 'contain',
+                              flexShrink: 0,
+                              backgroundColor: 'grey.50',
+                              border: '1px solid',
+                              borderColor: 'grey.200'
+                            }}
+                            onError={(e) => {
+                              // Hide logo if it fails to load
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <Typography
+                          variant="h6"
+                          className="server-title"
+                          sx={{
+                            color: 'primary.main',
+                            flex: 1,
+                            minWidth: 0 // Allow text to truncate
+                          }}
+                        >
+                          {getDisplayName(server.name)}
+                        </Typography>
+                      </Box>
 
                       {/* Badges Row: Config badges on left, Status badges on right */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
@@ -1665,19 +1698,51 @@ const RegistryDetailPage: React.FC = () => {
                 {filteredDeployedServers.map((server) => (
                   <Card key={server.name} elevation={2}>
                     <CardContent>
-                      {/* Title */}
-                      <Typography
-                        variant="h6"
+                      {/* Title with Logo */}
+                      <Box
                         sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          mb: 1,
                           cursor: 'pointer',
-                          color: 'primary.main',
-                          '&:hover': { textDecoration: 'underline' },
-                          mb: 1
+                          '&:hover .server-title': { textDecoration: 'underline' }
                         }}
                         onClick={() => handleServerClick(server, true)}
                       >
-                        {server.name}
-                      </Typography>
+                        {server.logoUrl && (
+                          <Box
+                            component="img"
+                            src={server.logoUrl}
+                            alt={`${server.name} logo`}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 1,
+                              objectFit: 'contain',
+                              flexShrink: 0,
+                              backgroundColor: 'grey.50',
+                              border: '1px solid',
+                              borderColor: 'grey.200'
+                            }}
+                            onError={(e) => {
+                              // Hide logo if it fails to load
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <Typography
+                          variant="h6"
+                          className="server-title"
+                          sx={{
+                            color: 'primary.main',
+                            flex: 1,
+                            minWidth: 0 // Allow text to truncate
+                          }}
+                        >
+                          {server.name}
+                        </Typography>
+                      </Box>
 
                       {/* Badges Row: Config badges on left, Status badges on right */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
@@ -1876,112 +1941,141 @@ const RegistryDetailPage: React.FC = () => {
           {selectedServer && (
             <>
               <DialogTitle>
-                {selectedServer.name}
-                {selectedServer.tier && (
-                  <Tooltip title={`Server tier: ${selectedServer.tier === 'official' ? 'Official ToolHive server, maintained by the core team' : selectedServer.tier === 'community' ? 'Community-maintained server, verified for quality' : 'Third-party server, use with caution'}`}>
-                    <Chip
-                      label={selectedServer.tier}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                      sx={{ ml: 2 }}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {selectedServer.logoUrl && (
+                    <Box
+                      component="img"
+                      src={selectedServer.logoUrl}
+                      alt={`${selectedServer.name} logo`}
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 1,
+                        objectFit: 'contain',
+                        flexShrink: 0,
+                        backgroundColor: 'grey.50',
+                        border: '1px solid',
+                        borderColor: 'grey.200'
+                      }}
+                      onError={(e) => {
+                        // Hide logo if it fails to load
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
                     />
-                  </Tooltip>
-                )}
-              </DialogTitle>
-              <DialogContent sx={{ p: 0 }}>
-                {/* Description and Badges Section - Above Tabs */}
-                <Box sx={{ p: 3, pb: 2 }}>
-                  {selectedServer.description && (
-                    <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
-                      {selectedServer.description}
-                    </Typography>
                   )}
-
-                  {/* Status and Transport Chips */}
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2, overflowX: 'auto' }}>
-                    {selectedServer.transport && (
-                      <Tooltip title={`Transport: ${selectedServer.transport}`}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {getDisplayName(selectedServer.name)}
+                    {selectedServer.tier && (
+                      <Tooltip title={`Server tier: ${selectedServer.tier === 'official' ? 'Official ToolHive server, maintained by the core team' : selectedServer.tier === 'community' ? 'Community-maintained server, verified for quality' : 'Third-party server, use with caution'}`}>
                         <Chip
-                          label={selectedServer.transport}
+                          label={selectedServer.tier}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ ml: 2 }}
+                        />
+                      </Tooltip>
+                    )}
+                  </Box>
+                </Box>
+              </DialogTitle>
+
+              {/* Fixed Description and Badges Section */}
+              <Box sx={{ p: 3, pb: 2 }}>
+                {selectedServer.description && (
+                  <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+                    {selectedServer.description}
+                  </Typography>
+                )}
+
+                {/* Status and Transport Chips */}
+                <Box sx={{ display: 'flex', gap: 1, mb: 2, overflowX: 'auto' }}>
+                  {selectedServer.transport && (
+                    <Tooltip title={`Transport: ${selectedServer.transport}`}>
+                      <Chip
+                        label={selectedServer.transport}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                      />
+                    </Tooltip>
+                  )}
+                  {selectedServer.status && (
+                    <Tooltip title={`Deployment status: ${selectedServer.status === 'Running' ? 'Server is running and operational' : selectedServer.status === 'Active' ? 'Server is active and available' : selectedServer.status === 'Pending' ? 'Server deployment is in progress' : selectedServer.status === 'Failed' ? 'Server deployment failed' : `Current status: ${selectedServer.status}`}`}>
+                      <Chip
+                        label={selectedServer.status}
+                        size="small"
+                        color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
+                        variant="filled"
+                      />
+                    </Tooltip>
+                  )}
+                  {selectedServer.ready !== undefined && (
+                    <Tooltip title={selectedServer.ready ? 'Server is ready to accept connections and process requests' : 'Server is not ready - may be starting up or experiencing issues'}>
+                      <Chip
+                        label={selectedServer.ready ? 'Ready' : 'Not Ready'}
+                        size="small"
+                        color={selectedServer.ready ? 'success' : 'warning'}
+                        variant="outlined"
+                      />
+                    </Tooltip>
+                  )}
+                </Box>
+
+                {/* Statistics Section */}
+                {selectedServer.metadata && (
+                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
+                    {selectedServer.metadata.stars !== undefined && (
+                      <Tooltip title={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}>
+                        <Chip
+                          label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      </Tooltip>
+                    )}
+                    {selectedServer.metadata.pulls !== undefined && (
+                      <Tooltip title={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}>
+                        <Chip
+                          label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
                           size="small"
                           color="secondary"
                           variant="outlined"
                         />
                       </Tooltip>
                     )}
-                    {selectedServer.status && (
-                      <Tooltip title={`Deployment status: ${selectedServer.status === 'Running' ? 'Server is running and operational' : selectedServer.status === 'Active' ? 'Server is active and available' : selectedServer.status === 'Pending' ? 'Server deployment is in progress' : selectedServer.status === 'Failed' ? 'Server deployment failed' : `Current status: ${selectedServer.status}`}`}>
+                    {selectedServer.metadata.last_updated && (
+                      <Tooltip title={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}>
                         <Chip
-                          label={selectedServer.status}
+                          label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
                           size="small"
-                          color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
-                          variant="filled"
-                        />
-                      </Tooltip>
-                    )}
-                    {selectedServer.ready !== undefined && (
-                      <Tooltip title={selectedServer.ready ? 'Server is ready to accept connections and process requests' : 'Server is not ready - may be starting up or experiencing issues'}>
-                        <Chip
-                          label={selectedServer.ready ? 'Ready' : 'Not Ready'}
-                          size="small"
-                          color={selectedServer.ready ? 'success' : 'warning'}
+                          color="info"
                           variant="outlined"
                         />
                       </Tooltip>
                     )}
                   </Box>
+                )}
+              </Box>
 
-                  {/* Statistics Section */}
-                  {selectedServer.metadata && (
-                    <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                      {selectedServer.metadata.stars !== undefined && (
-                        <Tooltip title={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}>
-                          <Chip
-                            label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </Tooltip>
-                      )}
-                      {selectedServer.metadata.pulls !== undefined && (
-                        <Tooltip title={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}>
-                          <Chip
-                            label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                        </Tooltip>
-                      )}
-                      {selectedServer.metadata.last_updated && (
-                        <Tooltip title={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}>
-                          <Chip
-                            label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        </Tooltip>
-                      )}
-                    </Box>
-                  )}
-                </Box>
+              {/* Fixed Server Detail Tabs */}
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs
+                  value={serverDialogTabValue}
+                  onChange={handleServerDialogTabChange}
+                  aria-label="server detail tabs"
+                  sx={{ px: 3 }}
+                >
+                  <Tab label="Overview" />
+                  <Tab label="Tools" />
+                  <Tab label="Config" />
+                  <Tab label="Manual Installation" />
+                </Tabs>
+              </Box>
 
-                {/* Server Detail Tabs */}
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                  <Tabs
-                    value={serverDialogTabValue}
-                    onChange={handleServerDialogTabChange}
-                    aria-label="server detail tabs"
-                  >
-                    <Tab label="Overview" />
-                    <Tab label="Tools" />
-                    <Tab label="Config" />
-                    <Tab label="Manual Installation" />
-                  </Tabs>
-                </Box>
+              {/* Scrollable Content Section */}
+              <DialogContent sx={{ p: 0, overflow: 'auto' }}>
 
                 {/* Tab Panel: Overview */}
                 {serverDialogTabValue === 0 && (
@@ -2009,6 +2103,22 @@ const RegistryDetailPage: React.FC = () => {
                         </Tooltip>
                       </Box>
                     )}
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                        Server Name:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                        {selectedServer.name}
+                      </Typography>
+                      <Tooltip title="Copy Server Name">
+                        <IconButton
+                          size="small"
+                          onClick={() => copyToClipboard(selectedServer.name)}
+                        >
+                          <CopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                     <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
                         Image:

@@ -12,6 +12,7 @@ interface RegistryServer {
   author?: string;
   repository?: string;
   documentation?: string;
+  logoUrl?: string;
 }
 
 interface DeployedServer {

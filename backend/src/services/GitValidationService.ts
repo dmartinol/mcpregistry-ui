@@ -203,6 +203,119 @@ export class GitValidationService {
   }
 
   /**
+   * Get project logo URL from a Git repository
+   */
+  async getProjectLogoUrl(repositoryUrl: string, branch: string = 'main'): Promise<string | null> {
+    console.log(`🔍 [LOGO ENTRY] Starting logo fetch for ${repositoryUrl}:${branch}`);
+
+    try {
+      const parsedUrl = new URL(repositoryUrl);
+      console.log(`🔍 [LOGO ENTRY] Parsed URL hostname: ${parsedUrl.hostname}`);
+
+      // For GitHub repositories, get the organization/user avatar
+      if (parsedUrl.hostname.includes('github.com')) {
+        const pathParts = parsedUrl.pathname.split('/').filter(p => p.length > 0);
+        if (pathParts.length >= 2) {
+          const owner = pathParts[0];
+          // GitHub avatar URL format: https://avatars.githubusercontent.com/u/USERNAME?v=4
+          // First, try to get the user/org info to get the numeric ID, but fallback to username
+          const avatarUrl = `https://avatars.githubusercontent.com/${owner}?v=4`;
+
+          console.log(`🔍 [LOGO DEBUG] Checking GitHub avatar for ${owner}: ${avatarUrl}`);
+
+          try {
+            // Create abort controller for timeout instead of AbortSignal.timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            // Verify the avatar exists
+            const response = await fetch(avatarUrl, {
+              method: 'HEAD',
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            console.log(`🔍 [LOGO DEBUG] Response status for ${owner}: ${response.status}`);
+
+            if (response.ok) {
+              console.log(`✅ [LOGO] Found logo for ${owner}: ${avatarUrl}`);
+              return avatarUrl;
+            } else {
+              console.log(`❌ [LOGO DEBUG] Non-OK response for ${owner}: ${response.status} ${response.statusText}`);
+            }
+          } catch (error) {
+            console.error(`❌ [LOGO DEBUG] Error fetching avatar for ${owner}:`, error);
+          }
+        }
+      }
+
+      // For GitLab repositories, try to get the user/group avatar
+      else if (parsedUrl.hostname.includes('gitlab.com')) {
+        const pathParts = parsedUrl.pathname.split('/').filter(p => p.length > 0);
+        if (pathParts.length >= 2) {
+          const owner = pathParts[0];
+          // GitLab avatar URL format: https://gitlab.com/uploads/-/system/user/avatar/ID/avatar.png
+          // Since we don't have the ID, we'll fallback to checking for common logo files
+          const avatarUrl = `https://gitlab.com/${owner}.png`;
+
+          try {
+            const response = await fetch(avatarUrl, {
+              method: 'HEAD',
+              signal: AbortSignal.timeout(5000)
+            });
+
+            if (response.ok) {
+              console.log(`✅ [LOGO] Found GitLab logo for ${owner}: ${avatarUrl}`);
+              return avatarUrl;
+            }
+          } catch (error) {
+            // Continue to file-based approach for GitLab
+          }
+        }
+      }
+
+      // Fallback: Look for common logo files in the repository
+      const logoFiles = [
+        'logo.png', 'logo.svg', 'logo.jpg', 'logo.jpeg',
+        'icon.png', 'icon.svg', 'icon.jpg', 'icon.jpeg',
+        'assets/logo.png', 'assets/logo.svg', 'assets/icon.png', 'assets/icon.svg',
+        'docs/logo.png', 'docs/logo.svg', 'docs/icon.png', 'docs/icon.svg',
+        '.github/logo.png', '.github/logo.svg', '.github/icon.png', '.github/icon.svg',
+        'images/logo.png', 'images/logo.svg', 'images/icon.png', 'images/icon.svg'
+      ];
+
+      for (const logoFile of logoFiles) {
+        try {
+          const rawUrl = this.constructRawUrl(repositoryUrl, logoFile, branch);
+          if (!rawUrl) {
+            continue;
+          }
+
+          const response = await fetch(rawUrl, {
+            method: 'HEAD', // Just check if file exists
+            signal: AbortSignal.timeout(5000) // 5 seconds timeout
+          });
+
+          if (response.ok) {
+            console.log(`✅ [LOGO] Found repository logo at: ${rawUrl}`);
+            return rawUrl;
+          }
+        } catch (error) {
+          // Continue to next logo file
+          continue;
+        }
+      }
+
+    } catch (error) {
+      console.error('Error fetching project logo:', error);
+    }
+
+    console.log(`📄 [LOGO] No logo found for ${repositoryUrl}`);
+    return null;
+  }
+
+  /**
    * Get file content from a Git repository using raw URLs
    */
   async getFileContent(repositoryUrl: string, filePath: string, branch: string = 'main'): Promise<string | null> {

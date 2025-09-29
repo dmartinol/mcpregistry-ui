@@ -30,6 +30,7 @@ interface RegistryServer {
   author?: string;
   repository?: string;
   documentation?: string;
+  logoUrl?: string;
 }
 
 interface ServerCardProps {
@@ -100,6 +101,7 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server, onClick, onDeplo
         {/* Header with Avatar and Name */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Avatar
+            src={server.logoUrl}
             sx={{
               mr: 2,
               bgcolor: 'primary.main',

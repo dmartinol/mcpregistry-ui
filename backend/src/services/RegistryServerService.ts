@@ -1,4 +1,5 @@
 import { RegistryServer, RegistryServersResponse, validateRegistryServer } from '../models/RegistryServer';
+import { GitValidationService } from './GitValidationService';
 
 /**
  * Query parameters for fetching registry servers
@@ -14,6 +15,11 @@ export interface RegistryServersQuery {
  * This service fetches server definitions from external registry APIs.
  */
 export class RegistryServerService {
+  private gitValidationService: GitValidationService;
+
+  constructor() {
+    this.gitValidationService = new GitValidationService();
+  }
   /**
    * Fetches available servers from a registry source
    * @param registryId The registry identifier
@@ -253,6 +259,7 @@ export class RegistryServerService {
       env_vars: server.env_vars || [],
       metadata: server.metadata,
       repository_url: server.repository_url,
+      logoUrl: server.logoUrl,
     };
 
       return transformedServer;
@@ -275,18 +282,30 @@ export class RegistryServerService {
       try {
         // Check if server has a fallback image (indicates missing data)
         const hasFallbackImage = server.image === `${server.name}:latest`;
+        const needsRepositoryData = !server.repository && !server.repository_url;
 
-        console.log(`🔧 [SUPPLEMENT] Server ${server.name}: image="${server.image}", hasFallbackImage=${hasFallbackImage}`);
+        console.log(`🔧 [SUPPLEMENT] Server ${server.name}: image="${server.image}", hasFallbackImage=${hasFallbackImage}, needsRepositoryData=${needsRepositoryData}`);
 
-        if (hasFallbackImage) {
-          console.log(`🔧 [SUPPLEMENT] Fetching complete data for ${server.name} (missing image field)`);
+        if (hasFallbackImage || needsRepositoryData) {
+          console.log(`🔧 [SUPPLEMENT] Fetching complete data for ${server.name} (${hasFallbackImage ? 'missing image field' : 'missing repository data'})`);
 
-          // Fetch individual server details to get the real image
+          // Fetch individual server details to get the real image and repository data
           const completeServerData = await this.fetchRawServerDataFromRegistry(registryId, server.name);
 
-          if (completeServerData && (completeServerData as any).image) {
-            console.log(`✅ [SUPPLEMENT] Found real image for ${server.name}: ${(completeServerData as any).image}`);
-            server.image = (completeServerData as any).image;
+          if (completeServerData) {
+            // Update image if missing
+            if (hasFallbackImage && (completeServerData as any).image) {
+              console.log(`✅ [SUPPLEMENT] Found real image for ${server.name}: ${(completeServerData as any).image}`);
+              server.image = (completeServerData as any).image;
+            }
+
+            // Always update repository data for logo fetching
+            if ((completeServerData as any).repository) {
+              server.repository = (completeServerData as any).repository;
+            }
+            if ((completeServerData as any).repository_url) {
+              server.repository_url = (completeServerData as any).repository_url;
+            }
 
             // Also update other fields that might be missing from list endpoint
             if ((completeServerData as any).env_vars) {
@@ -299,9 +318,12 @@ export class RegistryServerService {
               server.tools = (completeServerData as any).tools;
             }
           } else {
-            console.warn(`⚠️ [SUPPLEMENT] Could not fetch complete data for ${server.name}, keeping fallback image`);
+            console.warn(`⚠️ [SUPPLEMENT] Could not fetch complete data for ${server.name}`);
           }
         }
+
+        // Fetch logo from repository if available
+        await this.fetchServerLogo(server);
 
         supplementedServers.push(server);
       } catch (error) {
@@ -312,6 +334,47 @@ export class RegistryServerService {
     }
 
     return supplementedServers;
+  }
+
+  /**
+   * Fetches project logo for a server from its repository
+   * @param server The server to fetch logo for
+   */
+  private async fetchServerLogo(server: RegistryServer): Promise<void> {
+    try {
+      // Only fetch logo if server has a repository URL and doesn't already have a logo
+      if (!server.logoUrl && (server.repository || server.repository_url)) {
+        const repositoryUrl = server.repository_url || server.repository;
+
+        if (repositoryUrl && this.isGitRepository(repositoryUrl)) {
+          console.log(`🖼️ [LOGO] Fetching logo for server ${server.name} from ${repositoryUrl}`);
+          const logoUrl = await this.gitValidationService.getProjectLogoUrl(repositoryUrl);
+
+          if (logoUrl) {
+            server.logoUrl = logoUrl;
+            console.log(`✅ [LOGO] Found logo for ${server.name}: ${logoUrl}`);
+          } else {
+            console.log(`📄 [LOGO] No logo found for ${server.name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ [LOGO] Failed to fetch logo for server ${server.name}:`, error);
+      // Don't fail the entire process if logo fetching fails
+    }
+  }
+
+  /**
+   * Check if a URL is a Git repository
+   */
+  private isGitRepository(url: string): boolean {
+    try {
+      const parsedUrl = new URL(url);
+      const validHosts = ['github.com', 'gitlab.com', 'bitbucket.org'];
+      return validHosts.some(host => parsedUrl.hostname.includes(host));
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -672,6 +735,10 @@ export class RegistryServerService {
 
       // Transform and validate individual server response
       const transformedServer = this.transformIndividualServerResponse(data);
+
+      // Fetch logo if available
+      await this.fetchServerLogo(transformedServer);
+
       return this.validateServerData(transformedServer);
 
     } catch (error) {
@@ -774,6 +841,10 @@ export class RegistryServerService {
 
       // Transform and validate individual server response
       const transformedServer = this.transformIndividualServerResponse(data);
+
+      // Fetch logo if available
+      await this.fetchServerLogo(transformedServer);
+
       return this.validateServerData(transformedServer);
 
     } catch (error) {
@@ -810,7 +881,13 @@ export class RegistryServerService {
       ready: data.ready,
       namespace: data.namespace,
       // Enhanced fields from individual server endpoint
-      env_vars: data.env_vars || [],
+      env_vars: (data.env_vars || []).map((env: any) => ({
+        name: env.name,
+        description: env.description,
+        required: env.required,
+        secret: env.secret
+        // Note: excluding 'default' field to avoid validation issues
+      })),
       metadata: data.metadata || null,
       repository_url: data.repository_url,
     };

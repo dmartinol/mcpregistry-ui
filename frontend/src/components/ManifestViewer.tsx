@@ -430,7 +430,82 @@ export const ManifestViewer: React.FC<ManifestViewerProps> = ({
         </Tooltip>
       </DialogTitle>
 
-      {renderContent()}
+      {/* Fixed Tabs Section */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          aria-label="manifest format tabs"
+        >
+          <Tab
+            label="YAML"
+            id="manifest-tab-0"
+            aria-controls="manifest-tabpanel-0"
+          />
+          <Tab
+            label="JSON"
+            id="manifest-tab-1"
+            aria-controls="manifest-tabpanel-1"
+          />
+        </Tabs>
+      </Box>
+
+      {/* Scrollable Content Section */}
+      <Box sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+        <TabPanel value={tabValue} index={0}>
+          <Box sx={{ position: 'relative' }}>
+            <Tooltip title="Copy YAML">
+              <IconButton
+                onClick={() => copyToClipboard(yamlContent)}
+                sx={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  zIndex: 1,
+                  bgcolor: 'background.paper',
+                  boxShadow: 1,
+                  '&:hover': {
+                    bgcolor: 'grey.100',
+                  },
+                }}
+                size="small"
+              >
+                <CopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <CodeEditor>
+              {renderCodeWithFolding(yamlLines, yamlFoldState, true)}
+            </CodeEditor>
+          </Box>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={1}>
+          <Box sx={{ position: 'relative' }}>
+            <Tooltip title="Copy JSON">
+              <IconButton
+                onClick={() => copyToClipboard(jsonContent)}
+                sx={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  zIndex: 1,
+                  bgcolor: 'background.paper',
+                  boxShadow: 1,
+                  '&:hover': {
+                    bgcolor: 'grey.100',
+                  },
+                }}
+                size="small"
+              >
+                <CopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <CodeEditor>
+              {renderCodeWithFolding(jsonLines, jsonFoldState, false)}
+            </CodeEditor>
+          </Box>
+        </TabPanel>
+      </Box>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} variant="contained">

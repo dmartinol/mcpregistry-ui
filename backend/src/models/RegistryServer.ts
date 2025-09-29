@@ -76,6 +76,9 @@ export interface RegistryServer {
 
   /** Repository URL (more specific than generic repository field) */
   repository_url?: string;
+
+  /** Project logo URL */
+  logoUrl?: string;
 }
 
 /**
@@ -176,7 +179,8 @@ export const registryServerSchema = Joi.object<RegistryServer>({
     })
   ).optional(),
   metadata: Joi.object().unknown(true).optional(),
-  repository_url: Joi.string().uri().optional()
+  repository_url: Joi.string().uri().optional(),
+  logoUrl: Joi.string().uri().optional()
 });
 
 /**

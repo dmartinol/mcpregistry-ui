@@ -335,42 +335,46 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0 }}>
-        {error && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {error}
-          </Alert>
-        )}
+      {/* Fixed Error Alert Section */}
+      {error && (
+        <Alert severity="error" sx={{ mx: 2, mt: 2, mb: 0 }}>
+          {error}
+        </Alert>
+      )}
 
+      {/* Fixed Tabs Section */}
+      {!showManifest && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={currentTab}
+            onChange={handleTabChange}
+            aria-label="deployment configuration tabs"
+            sx={{ px: 2 }}
+          >
+            <Tab
+              label="Server"
+              id="deploy-tab-0"
+              aria-controls="deploy-tabpanel-0"
+            />
+            <Tab
+              label="Environment Variables"
+              id="deploy-tab-1"
+              aria-controls="deploy-tabpanel-1"
+            />
+            <Tab
+              label="Resources"
+              id="deploy-tab-2"
+              aria-controls="deploy-tabpanel-2"
+            />
+          </Tabs>
+        </Box>
+      )}
+
+      {/* Scrollable Content Section */}
+      <DialogContent sx={{ p: 0, overflow: 'auto' }}>
         {!showManifest ? (
-          <Box>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs
-                value={currentTab}
-                onChange={handleTabChange}
-                aria-label="deployment configuration tabs"
-                sx={{ px: 2 }}
-              >
-                <Tab
-                  label="Server"
-                  id="deploy-tab-0"
-                  aria-controls="deploy-tabpanel-0"
-                />
-                <Tab
-                  label="Environment Variables"
-                  id="deploy-tab-1"
-                  aria-controls="deploy-tabpanel-1"
-                />
-                <Tab
-                  label="Resources"
-                  id="deploy-tab-2"
-                  aria-controls="deploy-tabpanel-2"
-                />
-              </Tabs>
-            </Box>
-
-            <Box sx={{ px: 2, pb: 2 }}>
-              <TabPanel value={currentTab} index={0}>
+          <Box sx={{ px: 2, pb: 2 }}>
+            <TabPanel value={currentTab} index={0}>
                 {/* Server Configuration */}
 
                 <TextField
@@ -379,6 +383,15 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                   value={config.name}
                   onChange={(e) => setConfig({ ...config, name: e.target.value })}
                   helperText="Must be a valid Kubernetes resource name"
+                  sx={{ mb: 2 }}
+                />
+
+                <TextField
+                  fullWidth
+                  label="Server Name"
+                  value={server.name}
+                  disabled
+                  helperText="Original server name from registry"
                   sx={{ mb: 2 }}
                 />
 
@@ -459,9 +472,9 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                   disabled
                   helperText="Namespace is determined by the registry configuration"
                 />
-              </TabPanel>
+            </TabPanel>
 
-              <TabPanel value={currentTab} index={1}>
+            <TabPanel value={currentTab} index={1}>
                 {/* Environment Variables */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="h6">Environment Variables</Typography>
@@ -531,9 +544,9 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                     No environment variables configured
                   </Typography>
                 )}
-              </TabPanel>
+            </TabPanel>
 
-              <TabPanel value={currentTab} index={2}>
+            <TabPanel value={currentTab} index={2}>
                 {/* Resource Configuration */}
                 <Typography variant="h6" sx={{ mb: 2 }}>Resource Configuration</Typography>
 
@@ -596,8 +609,7 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                     helperText="e.g., 64Mi, 512Mi"
                   />
                 </Box>
-              </TabPanel>
-            </Box>
+            </TabPanel>
           </Box>
         ) : (
           <Box>
