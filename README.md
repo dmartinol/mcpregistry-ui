@@ -2,13 +2,26 @@
 
 A comprehensive web-based UI for managing ToolHive registries in Kubernetes clusters. This application enables creating, listing, and inspecting registries, displaying registered servers with details, monitoring deployed instances, and deploying new instances from selected servers.
 
-## Features
+## Implemented Features
 
-- **Registry Management**: Create, list, inspect, and sync ToolHive registries
-- **Server Discovery**: Browse available servers with filtering and search capabilities
-- **Instance Deployment**: Deploy servers as instances to Kubernetes clusters
-- **Real-time Monitoring**: Monitor deployed instances with health and resource metrics
-- **Access Control**: Namespace-based RBAC integration with Kubernetes
+### Registry Management
+- **Registry Dashboard**: List all registries with status indicators, server counts, and source information
+- **Registry Creation**: Form-based registry creation with Git, HTTP, and ConfigMap sources
+- **Registry Details**: Comprehensive view with server listings and deployment status
+- **Sync Management**: Manual and automatic registry synchronization
+
+### Server Discovery and Deployment
+- **Server Browsing**: Card-based interface with search and filtering by transport, tier, and tags
+- **Server Details**: Comprehensive server popups with tabs for overview, tools, config, and installation
+- **Logo Integration**: GitHub organization/user avatars for visual server identification
+- **Deployment Configuration**: Multi-tab deployment dialog with environment variables and resource configuration
+- **Manifest Viewer**: YAML/JSON manifest preview with syntax highlighting
+
+### Instance Management
+- **Deployed Server Monitoring**: Track deployed instances with status indicators and endpoints
+- **Lifecycle Operations**: Delete deployed servers with confirmation dialogs
+- **Orphaned Server Detection**: Identify and manage unregistered servers
+- **Real-time Status**: Live updates for server health and readiness
 
 ## Architecture
 
@@ -32,18 +45,21 @@ A comprehensive web-based UI for managing ToolHive registries in Kubernetes clus
    ```bash
    git clone <repository-url>
    cd registry_ui
-   npm install
+
+   # Install backend dependencies
+   cd backend && npm install
+
+   # Install frontend dependencies
+   cd ../frontend && npm install
    ```
 
-2. **Backend setup**:
+2. **Start the backend** (terminal 1):
    ```bash
    cd backend
-   cp .env.example .env
-   # Edit .env with your configuration
    npm run dev
    ```
 
-3. **Frontend setup** (new terminal):
+3. **Start the frontend** (terminal 2):
    ```bash
    cd frontend
    npm run dev
@@ -171,10 +187,12 @@ rules:
 
 ## Contributing
 
-1. Follow the constitutional principles defined in `.specify/memory/constitution.md`
-2. Use TDD approach: write tests before implementation
-3. Maintain >90% test coverage
-4. Follow TypeScript strict mode
+1. Use TDD approach: write tests before implementation
+2. Maintain >90% test coverage
+3. Follow TypeScript strict mode
+4. Run quality gates before each commit:
+   - `npm run typecheck` (both frontend and backend)
+   - `npm run lint` (both frontend and backend)
 5. Use conventional commit messages
 
 ## License

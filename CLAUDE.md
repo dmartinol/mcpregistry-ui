@@ -1,8 +1,8 @@
-# ToolHive Registry Management - Development Guidelines
+# AI Assistant Guidelines - ToolHive Registry Management
 
-**Version**: 2.0.0 | **Last Updated**: 2025-09-24
+**Version**: 2.1.0 | **Last Updated**: 2025-09-30
 
-This document serves as the single source of truth for AI assistants working on the ToolHive Registry Management Application. It consolidates all development principles, technical specifications, and implementation guidelines.
+This document provides essential guidelines and context for AI assistants working on the ToolHive Registry Management Application.
 
 ## 🚨 CRITICAL COMPLETION REQUIREMENTS 🚨
 
@@ -29,32 +29,18 @@ The ToolHive Registry Management Application is a comprehensive web-based interf
 - Monitor deployed instance health and resource consumption
 - Manage instance lifecycle (scaling, termination, configuration)
 
-## Core Architecture Principles
+## Development Principles
 
-### I. Code Quality (NON-NEGOTIABLE)
-All code MUST follow test-driven development: tests written first, implementation second. Code MUST be maintainable with clear naming, proper documentation, and modular architecture. Static analysis tools MUST pass without warnings. Code reviews MUST verify adherence to style guides and architectural patterns.
+### Code Quality Standards
+- Follow test-driven development approach
+- Maintain clean, readable code with proper TypeScript typing
+- Use established patterns and Material-UI design system
+- Ensure accessibility compliance (WCAG 2.1 AA)
 
-**Rationale**: High-quality code reduces technical debt, improves maintainability, and ensures reliability in the MCP registry interface that developers depend on.
-
-### II. Testing Standards
-Comprehensive testing is MANDATORY: unit tests for all business logic, integration tests for API contracts, end-to-end tests for critical user workflows. Test coverage MUST be above 90%. Tests MUST be deterministic and fast (<5s for unit tests, <30s for integration tests). Contract testing MUST validate MCP protocol compliance.
-
-**Rationale**: The registry UI is a critical interface for MCP server discovery; comprehensive testing ensures reliability and protocol compliance.
-
-### III. User Experience Consistency
-All UI components MUST follow the established design system. User interactions MUST be predictable and accessible (WCAG 2.1 AA compliance). Loading states, error messages, and feedback MUST be consistent across all features. No feature ships without UX review and user testing validation.
-
-**Rationale**: Consistent UX reduces cognitive load for developers browsing the registry and ensures accessibility for all users.
-
-### IV. Performance Requirements
-API responses MUST complete within 200ms (p95). UI interactions MUST feel responsive (<100ms feedback). Page loads MUST complete within 2 seconds on 3G networks. Memory usage MUST remain under 100MB for typical user sessions. Performance budgets MUST be monitored and enforced in CI/CD.
-
-**Rationale**: Fast performance is essential for developer productivity when searching and discovering MCP servers.
-
-### V. Security & Compliance
-All user data MUST be encrypted in transit and at rest. Authentication MUST use secure protocols (OAuth 2.0/OIDC). Input validation MUST prevent injection attacks. Security headers MUST be properly configured. Regular security audits MUST be conducted and vulnerabilities addressed within 48 hours.
-
-**Rationale**: Registry data and user information must be protected to maintain trust in the MCP ecosystem.
+### Performance Guidelines
+- Keep API responses under 200ms when possible
+- Optimize UI interactions for responsiveness
+- Use efficient data fetching and caching strategies
 
 ## Technical Stack
 
@@ -144,98 +130,58 @@ frontend/
 - Comprehensive request/response validation
 - Consistent error response formats
 
-## Core Entities and Data Models
+## Key Data Models
 
-### Registry
-Represents a ToolHive registry containing server definitions.
-
+### Registry Interface
 ```typescript
 interface Registry {
   id: string;
   name: string;
   url: string;
-  description?: string;
   status: 'active' | 'syncing' | 'error' | 'inactive';
   serverCount: number;
-  lastSyncAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  metadata?: {
-    namespace: string;
-    uid: string;
-    phase?: string;
-  };
   source?: {
     type: 'configmap' | 'git' | 'http' | 'https';
     location: string;
     syncInterval?: string;
   };
+  // Additional metadata fields...
 }
 ```
 
-### Server (Available and Deployed)
-Represents server definitions and deployed instances.
-
+### Server Interface
 ```typescript
 interface Server {
   name: string;
   image: string;
-  version?: string;
   description?: string;
   tags: string[];
-  capabilities?: string[];
-  author?: string;
-  repository?: string;
-  documentation?: string;
   tier?: string;
   transport?: string;
-  tools?: string[];
-  tools_count?: number;
-  status?: string;
-  endpoint_url?: string;
-  ready?: boolean;
-  namespace?: string;
-  env_vars?: Array<{
-    name: string;
-    description: string;
-    required: boolean;
-    secret?: boolean;
-    default?: string;
-  }>;
-  metadata?: {
-    last_updated?: string;
-    pulls?: number;
-    stars?: number;
-  };
+  logoUrl?: string;
   repository_url?: string;
+  // Additional fields for deployment and configuration...
 }
 ```
 
-## Key Features and Implementation
+## Current Implementation Status
 
-### Registry Management
-- **Registry Dashboard**: List all registries with status indicators, server counts, and source information
-- **Registry Creation**: Form-based registry creation with validation
-- **Registry Details**: Comprehensive view with server listings and deployment status
-- **Sync Management**: Manual and automatic registry synchronization
+### ✅ Implemented Features
+- **Registry Dashboard**: Complete with status indicators and server counts
+- **Registry Creation**: Form-based creation with Git, HTTP, and ConfigMap sources
+- **Server Discovery**: Card-based browsing with search and filtering
+- **Server Details**: Multi-tab popups with comprehensive information
+- **Logo Integration**: GitHub avatars for visual server identification
+- **Deployment Dialog**: Multi-tab configuration with environment variables
+- **Manifest Viewer**: YAML/JSON preview with syntax highlighting
+- **Instance Management**: Deploy and delete servers with status monitoring
+- **Orphaned Server Detection**: Identify unregistered servers
 
-### Server Discovery and Deployment
-- **Server Browsing**: Card-based interface with filtering and search
-- **Server Details**: Comprehensive server information with deployment options
-- **Deployment Configuration**: Form-based deployment with environment variables
-- **Instance Management**: Lifecycle operations for deployed servers
-
-### Monitoring and Management
-- **Real-time Status**: WebSocket-based updates for instance status
-- **Resource Monitoring**: CPU, memory, and network usage metrics
-- **Log Access**: Container log streaming and historical access
-- **Health Monitoring**: Health check status and alerting
-
-### Multi-tenancy and Security
-- **Namespace Isolation**: RBAC-based access control
-- **Authentication**: Kubernetes ServiceAccount integration
-- **Authorization**: Role-based permissions for operations
-- **Audit Logging**: Comprehensive operation tracking
+### 🚧 Areas for Enhancement
+- Advanced filtering and search capabilities
+- Bulk operations for server management
+- Enhanced monitoring and alerting features
+- Multi-cluster registry support
 
 ## Development Workflow
 
@@ -264,129 +210,45 @@ interface Server {
 
 **⚠️ ALL CRITICAL QUALITY GATES MUST PASS BEFORE TASK COMPLETION ⚠️**
 
-## Integration Patterns
+## Important Implementation Details
 
-### Kubernetes API Integration
-- Use @kubernetes/client-node for all Kubernetes operations
-- Implement resource watching for real-time updates
-- Handle authentication through ServiceAccount tokens
-- Implement proper error handling and retry logic
-- Cache frequently accessed data with appropriate TTL
+### Logo Integration
+- GitHub organization/user avatars are fetched automatically
+- Backend supplements server data with repository information
+- Frontend displays logos in both server cards and popups
+- Fallback handling for servers without repository data
 
-### Registry API Integration
-- Support multiple registry formats and versions
-- Implement fallback mechanisms for API failures
-- Transform registry data to internal format
-- Validate server definitions against schema
-- Handle authentication and rate limiting
+### Data Flow Architecture
+- Backend fetches data from Kubernetes MCPRegistry APIs
+- Individual server endpoints provide enhanced data (repository URLs, logos)
+- Server list endpoints include supplementation for missing data
+- Frontend uses consistent interfaces across components
 
-### Real-time Updates
-- WebSocket connections for status updates
-- Server-sent events for log streaming
-- Optimistic UI updates with conflict resolution
-- Graceful degradation when real-time unavailable
+### Key Components
+- `RegistryServerService.ts`: Handles server data fetching and logo integration
+- `GitValidationService.ts`: Manages repository validation and logo fetching
+- `App.tsx`: Main application with server details dialogs
+- `DeployServerDialog.tsx`: Multi-tab deployment configuration
+- `ManifestViewer.tsx`: YAML/JSON syntax highlighting
 
-## Performance and Scalability
+## Common Tasks and Patterns
 
-### Caching Strategy
-- Registry server lists: 5 minutes TTL
-- Instance status: 30 seconds TTL
-- Monitoring metrics: 15 seconds TTL
-- User session data: Redis with appropriate expiration
+### Adding New Features
+1. **Start with interfaces**: Define TypeScript interfaces for data models
+2. **Backend first**: Implement API endpoints with proper validation
+3. **Frontend integration**: Create/update components with Material-UI
+4. **Test thoroughly**: Run quality gates and functional verification
 
-### API Performance
-- Connection pooling for Kubernetes API clients
-- Request debouncing for frequent operations
-- Pagination for large data sets
-- Lazy loading for expensive operations
+### Debugging Server Issues
+- Check backend logs for API proxy calls and Kubernetes operations
+- Verify data transformation in `RegistryServerService.ts`
+- Look for console errors in browser developer tools
+- Test API endpoints directly with curl/Postman
 
-### UI Performance
-- Component lazy loading and code splitting
-- Virtual scrolling for large lists
-- Optimized re-rendering with React.memo
-- Image optimization and lazy loading
+### UI Component Development
+- Use Material-UI components consistently
+- Follow established card-based patterns for data display
+- Implement proper loading states and error handling
+- Ensure responsive design and accessibility
 
-## Security Considerations
-
-### Authentication and Authorization
-- Kubernetes RBAC integration
-- Namespace-based access control
-- Service account token validation
-- Role-based UI feature access
-
-### Data Protection
-- HTTPS for all client-server communication
-- Input validation and sanitization
-- SQL injection prevention (though no SQL used)
-- XSS protection with CSP headers
-
-### Secrets Management
-- Kubernetes secrets for sensitive configuration
-- Environment variable protection
-- No hardcoded credentials in source code
-- Secure secret rotation procedures
-
-## Recent Feature Implementations
-
-### Registry Server Details View (002-when-i-select)
-- Added comprehensive registry details page with tabbed navigation
-- Implemented available servers tab with Material-UI card layout
-- Created deployed servers tab with endpoint URLs and copy functionality
-- Added search and filtering capabilities across servers
-- Implemented server deployment dialog with configuration options
-- Added manifest viewer with YAML/JSON formatting and code folding
-- Integrated delete confirmation for deployed servers
-
-**Key Technical Details:**
-- Server data transformation in `RegistryServerService.ts` with comprehensive error handling
-- Tags preservation logic for fallback scenarios when registry API fails
-- YAML formatting with proper array indentation in `ManifestViewer.tsx`
-- Clipboard integration for copying endpoints and manifests
-- Real-time status updates through Kubernetes API watching
-
-### Registry Management Foundation (001-build-an-application)
-- Built core registry management interface
-- Implemented Kubernetes CRD integration for MCPRegistry resources
-- Created responsive Material-UI based dashboard
-- Added registry creation and lifecycle management
-- Implemented RBAC-based security model
-
-## Error Handling and Debugging
-
-### Frontend Error Handling
-- Global error boundaries for React components
-- User-friendly error messages with actionable guidance
-- Automatic retry mechanisms for transient failures
-- Graceful degradation when services unavailable
-
-### Backend Error Handling
-- Structured error responses with consistent format
-- Kubernetes API error translation and retry logic
-- Comprehensive logging with structured data
-- Health check endpoints for monitoring
-
-### Debugging Strategies
-- Comprehensive logging with correlation IDs
-- Performance monitoring and alerting
-- Error aggregation and analysis
-- Debug mode for development environments
-
-## Future Roadmap Considerations
-
-### Planned Enhancements
-- Advanced filtering and search capabilities
-- Bulk operations for server management
-- Registry federation and multi-cluster support
-- Enhanced monitoring and alerting features
-- API versioning and backward compatibility
-
-### Technical Debt Management
-- Regular dependency updates and security patches
-- Performance optimization and monitoring
-- Code refactoring for maintainability
-- Documentation updates and API evolution
-
-This document serves as the comprehensive guide for all development activities on the ToolHive Registry Management Application. It should be updated as new features are implemented and architectural decisions are made.
-
-<!-- MANUAL ADDITIONS START -->
-<!-- MANUAL ADDITIONS END -->
+This document provides the essential context for AI assistants working on the ToolHive Registry Management Application.
