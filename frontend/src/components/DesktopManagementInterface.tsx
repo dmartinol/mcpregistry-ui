@@ -26,7 +26,6 @@ import {
   Storage as StorageIcon,
   GitHub as GitIcon,
   Sync as SyncIcon,
-  Launch as LaunchIcon,
   Delete as DeleteIcon,
   Code as ManifestIcon,
   ContentCopy as CopyIcon,
@@ -353,32 +352,60 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                     </Box>
                   </Box>
 
-                  {/* Registry Info */}
-                  <Box sx={{ mb: 2, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Chip
-                      label={`${registry.serverCount} Server${registry.serverCount !== 1 ? 's' : ''}`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                    />
+                  {/* Compact Status Line */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      {getSourceIcon(registry.source?.type || 'configmap')}
+                      <span style={{ fontWeight: 600 }}>{registry.source?.type || 'unknown'}</span>
+                      <span>•</span>
+                      <span>{registry.serverCount} server{registry.serverCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span>
+                        {registry.source?.syncInterval
+                          ? (registry.source.syncInterval === 'manual' ? 'manual sync' : `auto ${registry.source.syncInterval}`)
+                          : 'manual sync'}
+                      </span>
+                      <span>•</span>
+                      <span>
+                        {(registry.syncStatus?.lastSyncTime || registry.lastSyncAt)
+                          ? `${formatDate(registry.syncStatus?.lastSyncTime || registry.lastSyncAt!)} ago`
+                          : 'not synced'}
+                      </span>
+                    </Typography>
 
-                    {registry.source?.syncInterval && (
-                      <Chip
-                        icon={<SyncIcon fontSize="small" />}
-                        label={registry.source.syncInterval === 'manual' ? 'Manual' : `Auto (${registry.source.syncInterval})`}
-                        size="small"
-                        color={registry.source.syncInterval === 'manual' ? 'default' : 'success'}
-                        variant="outlined"
-                      />
-                    )}
-
-                    {(registry.syncStatus?.lastSyncTime || registry.lastSyncAt) && (
-                      <Chip
-                        label={`Synced ${formatDate(registry.syncStatus?.lastSyncTime || registry.lastSyncAt!)}`}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                      />
+                    {/* Data Source Location */}
+                    {registry.url && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.8rem',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          bgcolor: 'grey.50',
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 0.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {registry.url}
+                        </span>
+                        <Tooltip title="Copy URL">
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(registry.url)}
+                            sx={{ p: 0.25 }}
+                          >
+                            <CopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Typography>
                     )}
                   </Box>
 
@@ -393,35 +420,7 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                   <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                     <Divider sx={{ mb: 2 }} />
 
-                    {/* URL Info */}
-                    {registry.url && (
-                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            fontFamily: 'monospace',
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            mr: 1,
-                          }}
-                        >
-                          {registry.url}
-                        </Typography>
-                        <Tooltip title="Copy URL">
-                          <IconButton
-                            size="small"
-                            onClick={() => copyToClipboard(registry.url)}
-                          >
-                            <CopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    )}
-
-                    {/* Metadata */}
+                    {/* Additional Metadata */}
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="caption" display="block">
                         Created: {formatDate(registry.createdAt)}
@@ -453,7 +452,7 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                         onClick={(e) => onForceSync(registry.id, e)}
                         sx={{ minWidth: 100 }}
                       >
-                        Sync
+                        Force Sync
                       </Button>
 
                       <Tooltip title="View Registry Manifest">
@@ -470,18 +469,6 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                         </IconButton>
                       </Tooltip>
 
-                      <Tooltip title="Open Registry">
-                        <IconButton
-                          size="small"
-                          onClick={() => onRegistryClick(registry.id)}
-                          sx={{
-                            bgcolor: 'action.selected',
-                            '&:hover': { bgcolor: 'action.hover' },
-                          }}
-                        >
-                          <LaunchIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>

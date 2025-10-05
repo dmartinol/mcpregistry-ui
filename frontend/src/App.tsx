@@ -983,8 +983,14 @@ const RegistryDetailPage: React.FC = () => {
       <Dialog
           open={dialogOpen}
           onClose={handleDialogClose}
-          maxWidth="md"
+          maxWidth="lg"
           fullWidth
+          sx={{
+            '& .MuiDialog-paper': {
+              height: '90vh',
+              maxHeight: '90vh',
+            }
+          }}
         >
           {selectedServer && (
             <>
@@ -1028,83 +1034,44 @@ const RegistryDetailPage: React.FC = () => {
                 </Box>
               </DialogTitle>
 
-              {/* Fixed Description and Badges Section */}
-              <Box sx={{ p: 3, pb: 2 }}>
+              {/* Compact Status Line */}
+              <Box sx={{ px: 3, pb: 1 }}>
                 {selectedServer.description && (
-                  <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+                  <Typography variant="body2" sx={{ mb: 1.5, lineHeight: 1.4, color: 'text.secondary' }}>
                     {selectedServer.description}
                   </Typography>
                 )}
 
-                {/* Status and Transport Chips */}
-                <Box sx={{ display: 'flex', gap: 1, mb: 2, overflowX: 'auto' }}>
+                {/* Condensed Status Line */}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                   {selectedServer.transport && (
-                    <Tooltip title={`Transport: ${selectedServer.transport}`}>
-                      <Chip
-                        label={selectedServer.transport}
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                      />
-                    </Tooltip>
+                    <Chip
+                      label={selectedServer.transport}
+                      size="small"
+                      color="secondary"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
                   )}
                   {selectedServer.status && (
-                    <Tooltip title={`Deployment status: ${selectedServer.status === 'Running' ? 'Server is running and operational' : selectedServer.status === 'Active' ? 'Server is active and available' : selectedServer.status === 'Pending' ? 'Server deployment is in progress' : selectedServer.status === 'Failed' ? 'Server deployment failed' : `Current status: ${selectedServer.status}`}`}>
-                      <Chip
-                        label={selectedServer.status}
-                        size="small"
-                        color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
-                        variant="filled"
-                      />
-                    </Tooltip>
+                    <Chip
+                      label={selectedServer.status}
+                      size="small"
+                      color={selectedServer.status === 'Running' ? 'success' : selectedServer.status === 'Active' ? 'success' : 'error'}
+                      variant="filled"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
                   )}
                   {selectedServer.ready !== undefined && (
-                    <Tooltip title={selectedServer.ready ? 'Server is ready to accept connections and process requests' : 'Server is not ready - may be starting up or experiencing issues'}>
-                      <Chip
-                        label={selectedServer.ready ? 'Ready' : 'Not Ready'}
-                        size="small"
-                        color={selectedServer.ready ? 'success' : 'warning'}
-                        variant="outlined"
-                      />
-                    </Tooltip>
+                    <Chip
+                      label={selectedServer.ready ? 'Ready' : 'Not Ready'}
+                      size="small"
+                      color={selectedServer.ready ? 'success' : 'warning'}
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
                   )}
                 </Box>
-
-                {/* Statistics Section */}
-                {selectedServer.metadata && (
-                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                    {selectedServer.metadata.stars !== undefined && (
-                      <Tooltip title={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}>
-                        <Chip
-                          label={`⭐ ${selectedServer.metadata.stars.toLocaleString()}`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </Tooltip>
-                    )}
-                    {selectedServer.metadata.pulls !== undefined && (
-                      <Tooltip title={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}>
-                        <Chip
-                          label={`📦 ${selectedServer.metadata.pulls.toLocaleString()}`}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      </Tooltip>
-                    )}
-                    {selectedServer.metadata.last_updated && (
-                      <Tooltip title={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}>
-                        <Chip
-                          label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
-                      </Tooltip>
-                    )}
-                  </Box>
-                )}
               </Box>
 
               {/* Fixed Server Detail Tabs */}
@@ -1128,7 +1095,38 @@ const RegistryDetailPage: React.FC = () => {
                 {/* Tab Panel: Overview */}
                 {serverDialogTabValue === 0 && (
                   <Box sx={{ p: 3 }}>
-                  {/* Overview Content */}
+                  {/* Statistics Section */}
+                  {selectedServer.metadata && (
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" gutterBottom>Repository Statistics:</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {selectedServer.metadata.stars !== undefined && (
+                          <Chip
+                            label={`⭐ ${selectedServer.metadata.stars.toLocaleString()} stars`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        )}
+                        {selectedServer.metadata.pulls !== undefined && (
+                          <Chip
+                            label={`📦 ${selectedServer.metadata.pulls.toLocaleString()} pulls`}
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
+                        {selectedServer.metadata.last_updated && (
+                          <Chip
+                            label={`Updated: ${new Date(selectedServer.metadata.last_updated).toLocaleDateString()}`}
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  )}
 
                   {/* Technical Details Section */}
 

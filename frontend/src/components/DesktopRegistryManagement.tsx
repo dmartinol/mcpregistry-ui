@@ -20,7 +20,6 @@ import {
   CardContent,
   Tooltip,
   Collapse,
-  Divider,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -33,6 +32,8 @@ import {
   Code as ManifestIcon,
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
+  Storage as StorageIcon,
+  GitHub as GitIcon,
 } from '@mui/icons-material';
 import { Registry } from '../App';
 
@@ -87,6 +88,21 @@ interface DesktopRegistryManagementProps {
   serversLoading?: boolean;
   deployedServersLoading?: boolean;
 }
+
+const getSourceIcon = (type: string) => {
+  switch (type) {
+    case 'git':
+      return <GitIcon fontSize="small" />;
+    case 'configmap':
+      return <StorageIcon fontSize="small" />;
+    default:
+      return <StorageIcon fontSize="small" />;
+  }
+};
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString();
+};
 
 export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps> = ({
   registry,
@@ -194,19 +210,33 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
           },
         }}
       >
-        <CardContent>
-          {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+        <CardContent sx={{ pb: '12px !important' }}>
+          {/* CRITICAL TIER - Always Visible Header */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+              {/* Status Indicator Dot */}
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: isDeployed
+                    ? (server.status === 'Running' ? 'success.main' : server.status === 'Pending' ? 'warning.main' : 'error.main')
+                    : (server.ready ? 'success.main' : 'grey.400'),
+                  flexShrink: 0,
+                }}
+              />
+
+              {/* Logo */}
               {server.logoUrl && (
                 <Box
                   component="img"
                   src={server.logoUrl}
-                  alt={`${server.name} logo`}
+                  alt=""
                   sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 1,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 0.5,
                     objectFit: 'contain',
                     flexShrink: 0,
                     backgroundColor: 'grey.50',
@@ -218,15 +248,21 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                   }}
                 />
               )}
+
+              {/* Name - Clickable */}
               <Typography
-                variant="h6"
-                component="h2"
+                variant="subtitle1"
+                component="h3"
                 sx={{
                   cursor: 'pointer',
-                  color: 'primary.main',
-                  '&:hover': { textDecoration: 'underline' },
+                  color: 'text.primary',
+                  '&:hover': { color: 'primary.main' },
                   flex: 1,
                   fontWeight: 600,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.2,
                 }}
                 onClick={() => onServerClick(server, isDeployed)}
               >
@@ -234,152 +270,206 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
               </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              {server.tier && (
-                <Chip
-                  label={server.tier}
-                  color={server.tier === 'official' ? 'primary' : server.tier === 'community' ? 'secondary' : 'default'}
-                  size="small"
-                  variant="outlined"
-                />
-              )}
-              {isDeployed && server.status && (
-                <Chip
-                  label={server.status}
-                  color={server.status === 'Running' ? 'success' : server.status === 'Pending' ? 'warning' : 'error'}
-                  size="small"
-                />
-              )}
-            </Box>
-          </Box>
-
-          {/* Basic Info */}
-          <Box sx={{ mb: 2, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            {server.transport && (
+            {/* Tier Badge - Only if official/community */}
+            {server.tier && server.tier.toLowerCase() !== 'experimental' && (
               <Chip
-                label={server.transport}
+                label={server.tier.toLowerCase() === 'official' ? '⭐' : '👥'}
                 size="small"
-                color="secondary"
-                variant="outlined"
-              />
-            )}
-            {server.tools_count !== undefined && server.tools_count > 0 && (
-              <Chip
-                label={`${server.tools_count} tools`}
-                size="small"
-                color="info"
-                variant="outlined"
-              />
-            )}
-            {server.ready !== undefined && (
-              <Chip
-                label={server.ready ? 'Ready' : 'Not Ready'}
-                size="small"
-                color={server.ready ? 'success' : 'warning'}
-                variant="outlined"
+                sx={{
+                  minWidth: 28,
+                  height: 20,
+                  fontSize: '0.8rem',
+                  bgcolor: server.tier.toLowerCase() === 'official' ? '#fff3e0' : '#e3f2fd',
+                  color: server.tier.toLowerCase() === 'official' ? '#f57c00' : '#1976d2',
+                  border: '1px solid',
+                  borderColor: server.tier.toLowerCase() === 'official' ? '#ffb74d' : '#64b5f6',
+                  '& .MuiChip-label': {
+                    px: 0.5,
+                    fontWeight: 600
+                  }
+                }}
               />
             )}
           </Box>
 
-          {/* Description */}
+          {/* CRITICAL TIER - Compact Status Line */}
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              fontSize: '0.75rem',
+              lineHeight: 1.3,
+              mb: server.description ? 1 : 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.8,
+              flexWrap: 'wrap'
+            }}
+          >
+            {/* Transport */}
+            <span style={{ fontWeight: 500 }}>{server.transport || 'stdio'}</span>
+            <span>•</span>
+            {/* Tools Count */}
+            <span>{server.tools_count || 0} tools</span>
+            <span>•</span>
+            {/* Status */}
+            <span style={{
+              color: isDeployed
+                ? (server.status === 'Running' ? '#2e7d32' : server.status === 'Pending' ? '#ed6c02' : '#d32f2f')
+                : (server.ready ? '#2e7d32' : '#757575')
+            }}>
+              {isDeployed ? server.status : (server.ready ? 'ready' : 'not ready')}
+            </span>
+          </Typography>
+
+          {/* SECONDARY TIER - Description (if available) */}
           {server.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.5 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mb: 1.5,
+                lineHeight: 1.4,
+                fontSize: '0.85rem',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
               {server.description}
             </Typography>
           )}
 
-          {/* Expandable Details */}
+          {/* TERTIARY TIER - Expandable Technical Details */}
           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-            <Divider sx={{ mb: 2 }} />
-
-            {/* Technical Details */}
-            <Box sx={{ mb: 2, bgcolor: 'grey.50', borderRadius: 1, p: 2, fontFamily: 'monospace', fontSize: '0.875rem' }}>
-              <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+            <Box sx={{ mb: 1.5, bgcolor: 'grey.50', borderRadius: 1, p: 1.5, fontSize: '0.8rem' }}>
+              {/* Image */}
+              <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, minWidth: '50px' }}>
                   Image:
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
                   {server.image}{server.version && `:${server.version}`}
                 </Typography>
                 <Tooltip title="Copy Image">
                   <IconButton
                     size="small"
                     onClick={() => copyToClipboard(`${server.image}${server.version ? `:${server.version}` : ''}`)}
+                    sx={{ p: 0.25 }}
                   >
-                    <CopyIcon fontSize="small" />
+                    <CopyIcon fontSize="inherit" />
                   </IconButton>
                 </Tooltip>
               </Box>
 
+              {/* Endpoint */}
               {server.endpoint_url && (
-                <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
-                    Endpoint:
+                <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, minWidth: '50px' }}>
+                    URL:
                   </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
                     {server.endpoint_url}
                   </Typography>
-                  <Tooltip title="Copy Endpoint">
+                  <Tooltip title="Copy URL">
                     <IconButton
                       size="small"
                       onClick={() => copyToClipboard(server.endpoint_url!)}
+                      sx={{ p: 0.25 }}
                     >
-                      <CopyIcon fontSize="small" />
+                      <CopyIcon fontSize="inherit" />
                     </IconButton>
                   </Tooltip>
                 </Box>
               )}
 
+              {/* Namespace */}
               {server.namespace && (
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
-                    Namespace:
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, minWidth: '50px' }}>
+                    NS:
                   </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
                     {server.namespace}
                   </Typography>
                 </Box>
               )}
-            </Box>
 
-            {/* Tags */}
-            {server.tags && server.tags.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>Tags:</Typography>
-                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {server.tags.map((tag) => (
-                    <Chip key={tag} label={tag} size="small" />
+              {/* Tags */}
+              {server.tags && server.tags.length > 0 && (
+                <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {server.tags.slice(0, 6).map((tag) => (
+                    <Typography
+                      key={tag}
+                      variant="caption"
+                      sx={{
+                        bgcolor: 'background.paper',
+                        px: 0.5,
+                        py: 0.25,
+                        borderRadius: 0.5,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        fontSize: '0.7rem'
+                      }}
+                    >
+                      {tag}
+                    </Typography>
                   ))}
+                  {server.tags.length > 6 && (
+                    <Typography variant="caption" color="text.secondary">
+                      +{server.tags.length - 6} more
+                    </Typography>
+                  )}
                 </Box>
-              </Box>
-            )}
+              )}
+            </Box>
           </Collapse>
 
-          {/* Actions */}
+          {/* ACTION TIER - Smart Grouped Actions */}
           <Box sx={{
             display: 'flex',
-            gap: 1,
-            flexWrap: 'wrap',
             justifyContent: 'space-between',
             alignItems: 'center',
+            pt: 0.5
           }}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Primary Actions */}
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
               {!isDeployed && (
                 <Button
                   size="small"
                   variant="contained"
-                  startIcon={<DeployIcon />}
+                  startIcon={<DeployIcon fontSize="small" />}
                   onClick={() => onQuickDeploy?.(server)}
+                  sx={{ minWidth: 80, height: 28, fontSize: '0.75rem' }}
                 >
                   Deploy
                 </Button>
               )}
+
+              {/* Secondary Actions - Icon Only */}
+              <Tooltip title="View Details">
+                <IconButton
+                  size="small"
+                  onClick={() => onServerClick(server, isDeployed)}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    bgcolor: 'action.selected',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <ViewIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
 
               <Tooltip title="View Manifest">
                 <IconButton
                   size="small"
                   onClick={() => onShowManifest(server.name, isDeployed)}
                   sx={{
+                    width: 28,
+                    height: 28,
                     bgcolor: 'primary.main',
                     color: 'white',
                     '&:hover': { bgcolor: 'primary.dark' },
@@ -388,26 +478,16 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                   <ManifestIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-
-              <Tooltip title="View Details">
-                <IconButton
-                  size="small"
-                  onClick={() => onServerClick(server, isDeployed)}
-                  sx={{
-                    bgcolor: 'action.selected',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <ViewIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
             </Box>
 
+            {/* Utility Actions */}
             <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
               <IconButton
                 size="small"
                 onClick={() => toggleCardExpansion(server.name)}
                 sx={{
+                  width: 24,
+                  height: 24,
                   transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.3s ease',
                 }}
@@ -415,13 +495,17 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                 <ExpandIcon fontSize="small" />
               </IconButton>
 
+              {/* Destructive Action - Separated */}
               {isDeployed && onDeleteServer && (
                 <IconButton
                   size="small"
                   onClick={() => onDeleteServer(server)}
                   sx={{
+                    width: 24,
+                    height: 24,
                     color: 'error.main',
-                    '&:hover': { bgcolor: 'error.light' },
+                    '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
+                    ml: 0.5
                   }}
                 >
                   <DeleteIcon fontSize="small" />
@@ -468,6 +552,115 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
           </Button>
         </Box>
       </Box>
+
+      {/* Registry Metadata Panel */}
+      <Paper elevation={1} sx={{ mb: 3 }}>
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            📊 Registry Details
+          </Typography>
+
+          {/* Compact Status Line */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              {getSourceIcon(registry.source?.type || 'configmap')}
+              <span style={{ fontWeight: 600 }}>{registry.source?.type || 'unknown'}</span>
+              <span>•</span>
+              <span>{registry.serverCount} server{registry.serverCount !== 1 ? 's' : ''}</span>
+              <span>•</span>
+              <span>
+                {registry.source?.syncInterval
+                  ? (registry.source.syncInterval === 'manual' ? 'manual sync' : `auto ${registry.source.syncInterval}`)
+                  : 'manual sync'}
+              </span>
+              <span>•</span>
+              <span>
+                {(registry.syncStatus?.lastSyncTime || registry.lastSyncAt)
+                  ? `${formatDate(registry.syncStatus?.lastSyncTime || registry.lastSyncAt!)} ago`
+                  : 'not synced'}
+              </span>
+            </Typography>
+
+            {/* Data Source Location */}
+            {registry.url && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  bgcolor: 'grey.50',
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 0.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {registry.url}
+                </span>
+                <Tooltip title="Copy URL">
+                  <IconButton
+                    size="small"
+                    onClick={() => copyToClipboard(registry.url)}
+                    sx={{ p: 0.25 }}
+                  >
+                    <CopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Typography>
+            )}
+          </Box>
+
+          {/* Additional Metadata */}
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Status:
+              </Typography>
+              <Chip
+                label={registry.status}
+                color={registry.status === 'active' ? 'success' : registry.status === 'syncing' ? 'warning' : 'error'}
+                size="small"
+              />
+            </Box>
+
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Created:
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                {formatDate(registry.createdAt)}
+              </Typography>
+            </Box>
+
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Updated:
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                {formatDate(registry.updatedAt)}
+              </Typography>
+            </Box>
+
+            {registry.metadata?.namespace && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Namespace:
+                </Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                  {registry.metadata.namespace}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Paper>
 
       {/* Search and Filters */}
       <Paper elevation={1} sx={{ mb: 3 }}>
