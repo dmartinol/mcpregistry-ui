@@ -117,15 +117,27 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
 
   return (
     <Box>
-      {/* Header with controls */}
+      {/* Simplified Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h6" gutterBottom>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {/* Status indicator dot */}
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              bgcolor: orphanedServers.length > 0 ? 'warning.main' : 'success.main',
+              flexShrink: 0,
+            }}
+          />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
             Unregistered Servers
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            MCPServers not registered with any registry in namespace: {currentNamespace}
-          </Typography>
+          {orphanedServers.length > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              ({orphanedServers.length})
+            </Typography>
+          )}
         </Box>
         <Button
           variant="outlined"
@@ -144,22 +156,11 @@ export const OrphanedServersView: React.FC<OrphanedServersViewProps> = ({
         </Alert>
       )}
 
-      {/* Server count info */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="body1">
-          Found {orphanedServers.length} unregistered server{orphanedServers.length !== 1 ? 's' : ''}
-        </Typography>
-        {orphanedServers.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            These servers exist in Kubernetes but are not registered with any MCPRegistry.
-          </Typography>
-        )}
-      </Box>
 
       {/* Server cards */}
       {orphanedServers.length === 0 ? (
-        <Alert severity="info" sx={{ mt: 3 }}>
-          {loading ? 'Loading...' : 'No unregistered servers found in this namespace. All servers appear to be properly registered with registries.'}
+        <Alert severity="success" sx={{ mt: 3 }}>
+          {loading ? 'Loading...' : 'No unregistered servers found. All servers are properly registered.'}
         </Alert>
       ) : (
         <Grid container spacing={3}>

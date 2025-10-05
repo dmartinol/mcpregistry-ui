@@ -14,6 +14,8 @@ import {
   Box,
   Alert,
   CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { OrphanedServer } from './OrphanedServerCard';
 
@@ -44,6 +46,9 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
   onClose,
   onConnect,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [selectedRegistry, setSelectedRegistry] = useState('');
   const [serverNameInRegistry, setServerNameInRegistry] = useState('');
   const [connecting, setConnecting] = useState(false);
@@ -108,11 +113,12 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth={isMobile ? false : "sm"}
       fullWidth
+      fullScreen={isMobile}
     >
       <DialogTitle>
-        Register Server with Registry
+        Connect Server to Registry
       </DialogTitle>
 
       <DialogContent>
@@ -121,7 +127,7 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
             Server: {server.name}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            This will register the server with the selected registry by adding the required registry labels.
+            This will connect the server to the selected registry by adding the required registry labels.
           </Typography>
         </Box>
 
@@ -131,7 +137,11 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
           </Alert>
         )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isMobile ? 2 : 3
+        }}>
           <FormControl fullWidth required>
             <InputLabel>Registry</InputLabel>
             <Select
@@ -183,7 +193,15 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
         </Box>
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 1 : 0,
+        p: isMobile ? 2 : 1,
+        '& .MuiButton-root': {
+          minHeight: isMobile ? 48 : 36,
+          width: isMobile ? '100%' : 'auto'
+        }
+      }}>
         <Button
           onClick={handleClose}
           disabled={connecting}
@@ -196,7 +214,7 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
           disabled={connecting || !selectedRegistry || !serverNameInRegistry.trim() || registries.length === 0}
           startIcon={connecting ? <CircularProgress size={16} /> : undefined}
         >
-          {connecting ? 'Registering...' : 'Register'}
+          {connecting ? 'Connecting...' : 'Connect'}
         </Button>
       </DialogActions>
     </Dialog>

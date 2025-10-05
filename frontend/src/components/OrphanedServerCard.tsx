@@ -243,7 +243,7 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
         </Box>
 
 
-        {/* Register with Registry Button and Manifest Icon */}
+        {/* Connect to Registry Button and Manifest Icon */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
           <Button
             variant="contained"
@@ -255,7 +255,7 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
             }}
             sx={{ flex: 1, mr: onShowManifest ? 1 : 0 }}
           >
-            Register with Registry
+            Connect
           </Button>
           {onShowManifest && (
             <Tooltip title="Show Manifest">

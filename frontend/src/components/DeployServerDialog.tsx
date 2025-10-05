@@ -19,6 +19,8 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -121,6 +123,9 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   registryNamespace,
   onDeploy,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [config, setConfig] = useState<DeploymentConfig>({
     name: '',
     image: '',
@@ -325,7 +330,13 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
   if (!server) {return null;}
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth={isMobile ? false : "md"}
+      fullWidth
+      fullScreen={isMobile}
+    >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">Deploy {getDisplayName(server.name)}</Typography>
@@ -349,7 +360,16 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
             value={currentTab}
             onChange={handleTabChange}
             aria-label="deployment configuration tabs"
-            sx={{ px: 2 }}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : false}
+            sx={{
+              px: 2,
+              '& .MuiTab-root': {
+                minWidth: isMobile ? 100 : 160,
+                fontSize: isMobile ? '0.875rem' : '1rem',
+                minHeight: isMobile ? 48 : 48
+              }
+            }}
           >
             <Tab
               label="Server"
@@ -427,7 +447,12 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                   </FormControl>
                 )}
 
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: 2,
+                  mb: 2
+                }}>
                   <TextField
                     label="Target Port"
                     type="number"
@@ -508,7 +533,12 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                     </Box>
 
                     {/* Input fields */}
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: isMobile ? 'column' : 'row',
+                      gap: 2,
+                      alignItems: isMobile ? 'stretch' : 'flex-start'
+                    }}>
                       <TextField
                         label="Name"
                         value={envVar.name}
@@ -528,13 +558,26 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                         type={envVar.secret ? 'password' : 'text'}
                         helperText={envVar.secret ? 'This is a secret value' : ''}
                       />
-                      <IconButton
-                        onClick={() => removeEnvironmentVariable(index)}
-                        disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {isMobile ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                          <IconButton
+                            onClick={() => removeEnvironmentVariable(index)}
+                            disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
+                            size="small"
+                            sx={{ minHeight: 44, minWidth: 44 }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      ) : (
+                        <IconButton
+                          onClick={() => removeEnvironmentVariable(index)}
+                          disabled={envVar.required && server?.env && server.env.some(e => e.name === envVar.name)}
+                          size="small"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </Box>
                   </Box>
                 ))}
@@ -551,7 +594,12 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                 <Typography variant="h6" sx={{ mb: 2 }}>Resource Configuration</Typography>
 
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Limits</Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: 2,
+                  mb: 2
+                }}>
                   <TextField
                     label="CPU Limit"
                     value={config.resources.limits.cpu}
@@ -581,7 +629,11 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
                 </Box>
 
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Requests</Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: 2
+                }}>
                   <TextField
                     label="CPU Request"
                     value={config.resources.requests.cpu}
@@ -634,7 +686,15 @@ export const DeployServerDialog: React.FC<DeployServerDialogProps> = ({
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 1 : 0,
+        p: isMobile ? 2 : 1,
+        '& .MuiButton-root': {
+          minHeight: isMobile ? 48 : 36,
+          width: isMobile ? '100%' : 'auto'
+        }
+      }}>
         <Button onClick={onClose}>Cancel</Button>
         {!showManifest ? (
           <>

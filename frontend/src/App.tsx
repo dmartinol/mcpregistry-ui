@@ -6,12 +6,8 @@ import {
   Toolbar,
   Typography,
   Box,
-  Card,
-  CardContent,
   Alert,
   CircularProgress,
-  Grid,
-  Chip,
   Breadcrumbs,
   Link,
   Tabs,
@@ -24,32 +20,23 @@ import {
   DialogActions,
   Tooltip,
   IconButton,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+  Chip,
 } from '@mui/material';
 import {
   Home as HomeIcon,
   ContentCopy as CopyIcon,
   Launch as LaunchIcon,
   Refresh as RefreshIcon,
-  Sync as SyncIcon,
-  Storage as StorageIcon,
-  Http as HttpIcon,
-  GitHub as GitIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
   Delete as DeleteIcon,
-  Code as ManifestIcon,
-  Add as AddIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { DeployServerDialog } from './components/DeployServerDialog';
-import { OrphanedServersView } from './components/OrphanedServersView';
 import { ManifestViewer } from './components/ManifestViewer';
 import { CreateRegistryDialog, CreateMCPRegistryRequest } from './components/CreateRegistryDialog';
+import { ResponsiveRegistryView } from './components/ResponsiveRegistryView';
+import { ResponsiveRegistryDetailView } from './components/ResponsiveRegistryDetailView';
+import { ResponsiveOrphanedServersView } from './components/ResponsiveOrphanedServersView';
+import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { api, DeploymentConfig, MCPRegistryRequest } from './services/api';
 import { getDisplayName } from './utils/displayNames';
 
@@ -90,7 +77,7 @@ interface Server {
   image: string;
   version?: string;
   description?: string;
-  tags: string[];
+  tags?: string[];
   capabilities?: string[];
   author?: string;
   repository?: string;
@@ -170,7 +157,6 @@ const RegistryDashboard: React.FC = () => {
   const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
   const [manifest, setManifest] = useState<object | null>(null);
   const [manifestTitle, setManifestTitle] = useState('');
-  const [loadingManifest, setLoadingManifest] = useState(false);
 
   // Create Registry dialog state
   const [createRegistryOpen, setCreateRegistryOpen] = useState(false);
@@ -179,6 +165,10 @@ const RegistryDashboard: React.FC = () => {
   const [deleteRegistryConfirmOpen, setDeleteRegistryConfirmOpen] = useState(false);
   const [registryToDelete, setRegistryToDelete] = useState<Registry | null>(null);
   const [deletingRegistry, setDeletingRegistry] = useState(false);
+
+  // Force Sync confirmation state
+  const [forceSyncConfirmOpen, setForceSyncConfirmOpen] = useState(false);
+  const [registryToSync, setRegistryToSync] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const loadRegistries = async () => {
@@ -202,24 +192,6 @@ const RegistryDashboard: React.FC = () => {
     loadRegistries();
   }, [currentNamespace]);
 
-  const getStatusColor = (status: string): 'success' | 'error' | 'warning' | 'info' => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'success';
-      case 'error':
-        return 'error';
-      case 'syncing':
-        return 'warning';
-      case 'terminating':
-        return 'warning';
-      default:
-        return 'info';
-    }
-  };
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleString();
-  };
 
   const handleRegistryClick = (registryId: string) => {
     navigate(`/registries/${registryId}`);
@@ -240,12 +212,27 @@ const RegistryDashboard: React.FC = () => {
     }
   };
 
-  const handleForceSync = async (registryId: string, event: React.MouseEvent) => {
+  const handleForceSync = (registryId: string, event: React.MouseEvent) => {
     event.stopPropagation();
+
+    // Find the registry name for the confirmation dialog
+    const registry = registries.find(r => r.id === registryId);
+    const registryName = registry?.name || registryId;
+
+    // Show confirmation dialog
+    setRegistryToSync({ id: registryId, name: registryName });
+    setForceSyncConfirmOpen(true);
+  };
+
+  const confirmForceSync = async () => {
+    if (!registryToSync) return;
+
+    setForceSyncConfirmOpen(false);
+
     try {
-      const response = await fetch(`/api/v1/registries/${registryId}/force-sync`, { method: 'POST' });
+      const response = await fetch(`/api/v1/registries/${registryToSync.id}/force-sync`, { method: 'POST' });
       if (response.ok) {
-        console.log('Force sync initiated for registry:', registryId);
+        console.log('Force sync initiated for registry:', registryToSync.id);
         // Optionally refresh the data to show updated status
         await handleRefresh();
       } else {
@@ -254,11 +241,9 @@ const RegistryDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error('Error triggering force sync:', err);
+    } finally {
+      setRegistryToSync(null);
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -266,7 +251,6 @@ const RegistryDashboard: React.FC = () => {
   };
 
   const handleShowRegistryManifest = async (registryId: string) => {
-    setLoadingManifest(true);
     try {
       const manifestData = await api.getRegistryManifest(registryId);
       setManifest(manifestData);
@@ -274,41 +258,11 @@ const RegistryDashboard: React.FC = () => {
       setManifestViewerOpen(true);
     } catch (error) {
       console.error('Failed to load registry manifest:', error);
-    } finally {
-      setLoadingManifest(false);
     }
   };
 
 
 
-  const getSourceIcon = (type: string) => {
-    switch (type) {
-      case 'git':
-        return <GitIcon fontSize="small" />;
-      case 'configmap':
-        return <StorageIcon fontSize="small" />;
-      case 'http':
-      case 'https':
-        return <HttpIcon fontSize="small" />;
-      default:
-        return <StorageIcon fontSize="small" />;
-    }
-  };
-
-  const getSourceColor = (type: string): 'primary' | 'secondary' | 'success' | 'warning' => {
-    switch (type) {
-      case 'git':
-        return 'primary';
-      case 'configmap':
-        return 'secondary';
-      case 'http':
-        return 'warning';
-      case 'https':
-        return 'success';
-      default:
-        return 'secondary';
-    }
-  };
 
   const handleCreateRegistry = async (request: CreateMCPRegistryRequest) => {
     console.log('Creating registry with request:', request);
@@ -436,23 +390,6 @@ const RegistryDashboard: React.FC = () => {
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h4" component="h1">
-            MCP Registry
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Namespace</InputLabel>
-            <Select
-              value={currentNamespace}
-              label="Namespace"
-              onChange={(e) => setCurrentNamespace(e.target.value)}
-            >
-              <MenuItem value="toolhive-system">toolhive-system</MenuItem>
-              <MenuItem value="default">default</MenuItem>
-              <MenuItem value="kube-system">kube-system</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
 
         {/* Main Tab Navigation */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
@@ -482,223 +419,26 @@ const RegistryDashboard: React.FC = () => {
         {/* Tab Content */}
         <TabPanel value={tabValue} index={0}>
           {!loading && !error && (
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Found {registries.length} registries
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Showing registries from namespace: {currentNamespace}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setCreateRegistryOpen(true)}
-                    sx={{ minWidth: 140 }}
-                  >
-                    Create Registry
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    sx={{ minWidth: 120 }}
-                  >
-                    {refreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </Box>
-              </Box>
-
-            <Grid container spacing={3}>
-              {registries.map((registry) => (
-                <Grid item xs={12} md={6} key={registry.id}>
-                  <Card
-                    elevation={2}
-                  >
-                    <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                        <Typography
-                          variant="h6"
-                          component="h2"
-                          sx={{
-                            cursor: 'pointer',
-                            color: 'primary.main',
-                            '&:hover': { textDecoration: 'underline' }
-                          }}
-                          onClick={() => handleRegistryClick(registry.id)}
-                        >
-                          {registry.name}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          {registry.source && (
-                            <Tooltip title={`${registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}: ${registry.source.location}`}>
-                              <Chip
-                                icon={getSourceIcon(registry.source.type)}
-                                label={registry.source.type}
-                                color={getSourceColor(registry.source.type)}
-                                size="small"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          <Chip
-                            label={registry.status}
-                            color={getStatusColor(registry.status)}
-                            size="small"
-                          />
-                        </Box>
-                      </Box>
-
-                      {/* Registry Info Badges */}
-                      <Box sx={{ mb: 2, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {/* Sync Status Badge */}
-                        {registry.source?.syncInterval && (
-                          <Tooltip title={`Sync policy: ${registry.source.syncInterval === 'manual' ? 'Manual sync only' : `Automatic, every ${registry.source.syncInterval}`}`}>
-                            <Chip
-                              icon={<SyncIcon fontSize="small" />}
-                              label={registry.source.syncInterval === 'manual' ? 'Manual' : `Auto (${registry.source.syncInterval})`}
-                              size="small"
-                              color={registry.source.syncInterval === 'manual' ? 'default' : 'success'}
-                              variant="outlined"
-                            />
-                          </Tooltip>
-                        )}
-
-                        {/* Server Count Badge */}
-                        <Tooltip title={`Servers: ${registry.serverCount} available in this registry`}>
-                          <Chip
-                            label={`${registry.serverCount} Server${registry.serverCount !== 1 ? 's' : ''}`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </Tooltip>
-
-                        {/* Last Sync Badge */}
-                        <Tooltip title={`Last sync: ${registry.syncStatus?.lastSyncTime ? new Date(registry.syncStatus.lastSyncTime).toLocaleString() : registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synchronized'}`}>
-                          <Chip
-                            label={registry.syncStatus?.lastSyncTime ? new Date(registry.syncStatus.lastSyncTime).toLocaleString() : registry.lastSyncAt ? new Date(registry.lastSyncAt).toLocaleString() : 'Never synced'}
-                            size="small"
-                            color={registry.syncStatus?.lastSyncTime || registry.lastSyncAt ? 'info' : 'warning'}
-                            variant="outlined"
-                          />
-                        </Tooltip>
-                      </Box>
-
-                      {registry.description && (
-                        <Typography variant="body2" color="text.secondary" paragraph sx={{ mb: 2 }}>
-                          {registry.description}
-                        </Typography>
-                      )}
-
-                      {/* API Information */}
-                      {registry.url && (
-                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              fontFamily: 'monospace',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              mr: 1
-                            }}
-                          >
-                            {registry.url}
-                          </Typography>
-                          <Tooltip title="Copy API URL">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(registry.url);
-                              }}
-                            >
-                              <CopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      )}
-
-                      <Typography variant="caption" display="block" sx={{ mt: 2 }}>
-                        Created: {formatDate(registry.createdAt)}
-                      </Typography>
-
-                      <Typography variant="caption" display="block">
-                        Updated: {formatDate(registry.updatedAt)}
-                      </Typography>
-
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<SyncIcon />}
-                            onClick={(e) => handleForceSync(registry.id, e)}
-                            sx={{ minWidth: 120 }}
-                          >
-                            Force Sync
-                          </Button>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <Tooltip title="Preview Registry Manifest">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShowRegistryManifest(registry.id);
-                              }}
-                              disabled={loadingManifest}
-                              sx={{
-                                color: 'white',
-                                backgroundColor: 'primary.main',
-                                '&:hover': {
-                                  backgroundColor: 'primary.dark',
-                                  color: 'white',
-                                },
-                              }}
-                            >
-                              <ManifestIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRegistryToDelete(registry);
-                              setDeleteRegistryConfirmOpen(true);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-
-              {registries.length === 0 && (
-                <Alert severity="info" sx={{ mt: 3 }}>
-                  No registries found. Create your first registry to get started.
-                </Alert>
-              )}
-            </Box>
+            <ResponsiveRegistryView
+              registries={registries}
+              onRegistryClick={handleRegistryClick}
+              onCreateRegistry={() => setCreateRegistryOpen(true)}
+              onRefresh={handleRefresh}
+              onForceSync={handleForceSync}
+              onShowManifest={handleShowRegistryManifest}
+              onDelete={(registry) => {
+                setRegistryToDelete(registry);
+                setDeleteRegistryConfirmOpen(true);
+              }}
+              refreshing={refreshing}
+              currentNamespace={currentNamespace}
+              onNamespaceChange={setCurrentNamespace}
+            />
           )}
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <OrphanedServersView
+          <ResponsiveOrphanedServersView
             currentNamespace={currentNamespace}
           />
         </TabPanel>
@@ -758,6 +498,21 @@ const RegistryDashboard: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Force Sync Confirmation Dialog */}
+      <ConfirmationDialog
+        open={forceSyncConfirmOpen}
+        title="Confirm Registry Sync"
+        message={`Are you sure you want to force sync the registry "${registryToSync?.name}"? This will immediately pull the latest data from the registry source and may affect server availability during the sync process.`}
+        confirmLabel="Force Sync"
+        cancelLabel="Cancel"
+        onConfirm={confirmForceSync}
+        onCancel={() => {
+          setForceSyncConfirmOpen(false);
+          setRegistryToSync(null);
+        }}
+        severity="warning"
+      />
     </Box>
   );
 };
@@ -773,8 +528,11 @@ const RegistryDetailPage: React.FC = () => {
   const [deployedServersLoading, setDeployedServersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Force Sync confirmation state for detail page
+  const [detailForceSyncConfirmOpen, setDetailForceSyncConfirmOpen] = useState(false);
+
   // Initialize tab value from URL parameter, defaulting to 0
-  const [tabValue, setTabValue] = useState(() => {
+  const [tabValue] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
     return tab ? parseInt(tab, 10) : 0;
@@ -794,12 +552,6 @@ const RegistryDetailPage: React.FC = () => {
   const [serverDialogTabValue, setServerDialogTabValue] = useState(0);
   const [_serverDetailsLoading, setServerDetailsLoading] = useState(false);
 
-  // Search and filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [transportFilters, setTransportFilters] = useState<string[]>([]);
-  const [tierFilters, setTierFilters] = useState<string[]>([]);
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
-
   // Delete confirmation state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<Server | null>(null);
@@ -809,7 +561,7 @@ const RegistryDetailPage: React.FC = () => {
   const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
   const [manifest, setManifest] = useState<object | null>(null);
   const [manifestTitle, setManifestTitle] = useState('');
-  const [loadingManifest, setLoadingManifest] = useState(false);
+  const [_loadingManifest, setLoadingManifest] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Helper function to poll for resource deletion completion
@@ -865,102 +617,19 @@ const RegistryDetailPage: React.FC = () => {
     reloadWithCurrentTab();
   };
 
-  // Helper functions for source click handling
-  const parseConfigMapLocation = (location: string) => {
-    const parts = location.split(':');
-    return {
-      name: parts[0],
-      key: parts[1] || undefined
-    };
-  };
 
-  const handleSourceClick = (registry: Registry) => {
-    if (!registry.source) {return;}
-
-    if (registry.source.type === 'configmap') {
-      const { name } = parseConfigMapLocation(registry.source.location);
-      handleShowConfigMapManifest(name, registry.metadata?.namespace || 'toolhive-system');
-    } else if (registry.source.type === 'git') {
-      // Open Git repository to the specific registry file
-      const gitLocation = registry.source.location;
-      console.log('Git location:', gitLocation);
-
-      // Parse the git location: repository@branch/path or repository@branch
-      let repository, branch, path;
-
-      if (gitLocation.includes('@')) {
-        const [repoUrl, branchAndPath] = gitLocation.split('@');
-        repository = repoUrl;
-
-        if (branchAndPath.includes('/')) {
-          const [branchName, ...pathParts] = branchAndPath.split('/');
-          branch = branchName;
-          path = pathParts.join('/');
-        } else {
-          branch = branchAndPath;
-          path = 'data/registry.json'; // Default path
-        }
-      } else {
-        // No branch specified, assume main branch
-        repository = gitLocation;
-        branch = 'main';
-        path = 'data/registry.json';
-      }
-
-      console.log('Parsed - repository:', repository, 'branch:', branch, 'path:', path);
-
-      // Construct the direct file URL for GitHub/GitLab
-      let fileUrl;
-      if (repository.includes('github.com')) {
-        fileUrl = `${repository}/blob/${branch}/${path}`;
-      } else if (repository.includes('gitlab.com')) {
-        fileUrl = `${repository}/-/blob/${branch}/${path}`;
-      } else {
-        // Fallback to repository root for other Git providers
-        fileUrl = repository;
-      }
-
-      console.log('Final URL:', fileUrl);
-      window.open(fileUrl, '_blank');
-    }
-  };
-
-  const handleShowConfigMapManifest = async (configMapName: string, namespace: string) => {
-    if (!registryId) {return;}
-
-    setLoadingManifest(true);
-    try {
-      const manifestData = await api.getConfigMapManifest(registryId, configMapName, namespace);
-      setManifest(manifestData);
-      setManifestTitle(`${configMapName} ConfigMap`);
-      setManifestViewerOpen(true);
-    } catch (error) {
-      console.error('Failed to load ConfigMap manifest:', error);
-    } finally {
-      setLoadingManifest(false);
-    }
-  };
-
-  const handleShowRegistryManifest = async () => {
-    if (!registryId) {return;}
-
-    setLoadingManifest(true);
-    try {
-      const manifestData = await api.getRegistryManifest(registryId);
-      setManifest(manifestData);
-      setManifestTitle(`${registryId} Registry`);
-      setManifestViewerOpen(true);
-    } catch (error) {
-      console.error('Failed to load registry manifest:', error);
-    } finally {
-      setLoadingManifest(false);
-    }
-  };
-
-  const handleForceSync = async (event: React.MouseEvent) => {
-    if (!registryId) {return;}
+  const handleForceSync = (event: React.MouseEvent) => {
+    if (!registryId) return;
 
     event.stopPropagation();
+    setDetailForceSyncConfirmOpen(true);
+  };
+
+  const confirmDetailForceSync = async () => {
+    if (!registryId) return;
+
+    setDetailForceSyncConfirmOpen(false);
+
     try {
       const response = await fetch(`/api/v1/registries/${registryId}/force-sync`, { method: 'POST' });
       if (response.ok) {
@@ -1030,13 +699,6 @@ const RegistryDetailPage: React.FC = () => {
     loadData();
   }, [registryId, loadData]);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-    // Update URL parameter to persist tab state across page refreshes
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', newValue.toString());
-    window.history.replaceState({}, '', url.toString());
-  };
 
   const handleServerDialogTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setServerDialogTabValue(newValue);
@@ -1051,62 +713,6 @@ const RegistryDetailPage: React.FC = () => {
     navigator.clipboard.writeText(text);
   };
 
-  // Filter and search logic
-  const filterServers = (serverList: Server[]) => {
-    return serverList.filter(server => {
-      // Search filter
-      const matchesSearch = !searchQuery ||
-        server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        server.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        server.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      // Transport filter (multiple selection - OR logic)
-      const matchesTransport = transportFilters.length === 0 || transportFilters.includes(server.transport || '');
-
-      // Tier filter (multiple selection - OR logic)
-      const matchesTier = tierFilters.length === 0 || tierFilters.includes(server.tier || '');
-
-      // Status filter (multiple selection - OR logic, only for deployed servers)
-      const matchesStatus = statusFilters.length === 0 || statusFilters.includes(server.status || '');
-
-      return matchesSearch && matchesTransport && matchesTier && matchesStatus;
-    });
-  };
-
-  const filteredServers = filterServers(servers).sort((a, b) => a.name.localeCompare(b.name));
-  const filteredDeployedServers = filterServers(deployedServers).sort((a, b) => a.name.localeCompare(b.name));
-
-  // Get unique values for filter badges
-  const getAllTransports = () => {
-    const transports = new Set<string>();
-    [...servers, ...deployedServers].forEach(server => {
-      if (server.transport) {transports.add(server.transport);}
-    });
-    return Array.from(transports);
-  };
-
-  const getAllTiers = () => {
-    const tiers = new Set<string>();
-    [...servers, ...deployedServers].forEach(server => {
-      if (server.tier) {tiers.add(server.tier);}
-    });
-    return Array.from(tiers);
-  };
-
-  const getAllStatuses = () => {
-    const statuses = new Set<string>();
-    deployedServers.forEach(server => {
-      if (server.status) {statuses.add(server.status);}
-    });
-    return Array.from(statuses);
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setTransportFilters([]);
-    setTierFilters([]);
-    setStatusFilters([]);
-  };
 
   const handleServerClick = async (server: Server, isDeployed: boolean = false) => {
     setServerDetailsLoading(true);
@@ -1145,12 +751,6 @@ const RegistryDetailPage: React.FC = () => {
     setServerDialogTabValue(0);
   };
 
-  const handleDeployServer = () => {
-    if (selectedServer && registry) {
-      setSelectedRegistry(registry);
-      setDeployDialogOpen(true);
-    }
-  };
 
   const handleDeployDialogClose = () => {
     setDeployDialogOpen(false);
@@ -1287,652 +887,100 @@ const RegistryDetailPage: React.FC = () => {
               <Typography color="text.primary">{registry.name}</Typography>
             </Breadcrumbs>
 
-            <Paper elevation={2} sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="h4" component="h1">
+            <Paper elevation={1} sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
                     {registry.name}
                   </Typography>
-                  <Tooltip title="View registry manifest">
+                  {/* Status indicator - visual only */}
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      bgcolor: registry.status === 'active' ? 'success.main' :
+                               registry.status === 'syncing' ? 'warning.main' : 'error.main',
+                      flexShrink: 0,
+                    }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  {/* Force Sync - Emergency action */}
+                  <Tooltip title="Force Sync">
                     <IconButton
                       size="small"
-                      onClick={handleShowRegistryManifest}
-                      disabled={loadingManifest}
+                      onClick={handleForceSync}
+                      disabled={registry.status === 'syncing'}
                       sx={{
+                        bgcolor: 'warning.main',
                         color: 'white',
-                        backgroundColor: 'primary.main',
-                        '&:hover': {
-                          backgroundColor: 'primary.dark',
-                          color: 'white',
-                        },
+                        '&:hover': { bgcolor: 'warning.dark' },
+                        '&:disabled': { bgcolor: 'grey.300' },
                       }}
                     >
-                      <ManifestIcon />
+                      <SyncIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  {/* Content Refresh - Monitoring action */}
+                  <Tooltip title="Refresh Content">
+                    <IconButton
+                      size="small"
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                      sx={{
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                        '&:hover': { bgcolor: 'primary.dark' },
+                        '&:disabled': { bgcolor: 'grey.300' },
+                      }}
+                    >
+                      <RefreshIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<SyncIcon />}
-                    onClick={handleForceSync}
-                    size="small"
-                    disabled={registry.status === 'syncing'}
-                  >
-                    Force Sync
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRefresh}
-                    size="small"
-                    disabled={refreshing}
-                  >
-                    {refreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </Box>
               </Box>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                <Typography variant="body2">
-                  <strong>URL:</strong> {registry.url || 'Not specified'}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Status:</strong> {registry.status}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Server Count:</strong> {registry.serverCount}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Namespace:</strong> {registry.metadata?.namespace || 'Unknown'}
-                </Typography>
-              </Box>
-
-              {/* Source Information */}
-              {registry.source && (
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="body2">
-                      <strong>{registry.source.type === 'git' ? 'Git Source' : registry.source.type === 'configmap' ? 'ConfigMap Source' : `${registry.source.type.toUpperCase()} Source`}:</strong>
-                    </Typography>
-                    <Typography variant="body2">
-                      {registry.source.location}
-                    </Typography>
-                    {(registry.source.type === 'configmap' || registry.source.type === 'git') && (
-                      <LaunchIcon
-                        fontSize="small"
-                        sx={{
-                          cursor: 'pointer',
-                          '&:hover': {
-                            color: 'primary.dark',
-                          },
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSourceClick(registry);
-                        }}
-                      />
-                    )}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Sync Status Information */}
-              {(() => {
-                console.log(`🔍 [FRONTEND DEBUG] Registry ${registry.name} syncStatus:`, registry.syncStatus);
-                return (registry.syncStatus || registry.source?.syncInterval || registry.lastSyncAt) && (
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mt: 1 }}>
-                    {registry.source?.syncInterval && (
-                      <Typography variant="body2">
-                        <strong>Sync Policy:</strong> {registry.source.syncInterval === 'manual' ? 'Manual' : `Automatic (${registry.source.syncInterval})`}
-                      </Typography>
-                    )}
-                    {registry.syncStatus?.phase && (
-                      <Typography variant="body2">
-                        <strong>Sync Status:</strong> {registry.syncStatus.phase}
-                      </Typography>
-                    )}
-                    {registry.syncStatus?.message && (
-                      <Typography variant="body2">
-                        <strong>Message:</strong> {registry.syncStatus.message}
-                      </Typography>
-                    )}
-                    {registry.syncStatus?.lastSyncTime && (
-                      <Typography variant="body2">
-                        <strong>Last Sync:</strong> {new Date(registry.syncStatus.lastSyncTime).toLocaleString()}
-                      </Typography>
-                    )}
-                    {!registry.syncStatus?.lastSyncTime && registry.lastSyncAt && (
-                      <Typography variant="body2">
-                        <strong>Last Sync:</strong> {new Date(registry.lastSyncAt).toLocaleString()}
-                      </Typography>
-                    )}
-                  </Box>
-                );
-              })()}
             </Paper>
           </Box>
         </Container>
       </Box>
 
-      {/* Scrollable Content Section */}
-      <Container maxWidth="lg" sx={{ flex: 1, pt: 3 }}>
+      {/* Responsive Content Section */}
+      <ResponsiveRegistryDetailView
+        registry={registry}
+        availableServers={servers}
+        deployedServers={deployedServers}
+        onServerClick={handleServerClick}
+        onForceSync={handleForceSync}
+        onRefresh={handleRefresh}
+        onShowManifest={(serverName, isDeployed) => {
+          if (isDeployed) {
+            const server = deployedServers.find(s => s.name === serverName);
+            if (server) {
+              handleShowDeployedManifest(server);
+            }
+          } else {
+            handleShowServerManifest(serverName);
+          }
+        }}
+        onDeleteServer={(server) => {
+          setServerToDelete(server);
+          setDeleteConfirmOpen(true);
+        }}
+        onQuickDeploy={(server) => {
+          setSelectedServer(server);
+          if (registry) {
+            setSelectedRegistry(registry);
+            setDeployDialogOpen(true);
+          }
+        }}
+        refreshing={refreshing}
+        serversLoading={serversLoading}
+        deployedServersLoading={deployedServersLoading}
+      />
 
-        {/* Search and Filter Section */}
-        <Box sx={{ mb: 3 }}>
-          {/* Search Bar */}
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search servers by name, description, or tags..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-              endAdornment: searchQuery && (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setSearchQuery('')}
-                    edge="end"
-                    size="small"
-                  >
-                    <ClearIcon />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-            sx={{ mb: 2 }}
-          />
-
-          {/* Filter Badges */}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 1, fontWeight: 'bold' }}>
-              Filters:
-            </Typography>
-
-            {/* Transport Filter */}
-            {getAllTransports().map((transport) => (
-              <Chip
-                key={transport}
-                label={transport}
-                clickable
-                variant={transportFilters.includes(transport) ? 'filled' : 'outlined'}
-                color={transportFilters.includes(transport) ? 'primary' : 'default'}
-                onClick={() => {
-                  if (transportFilters.includes(transport)) {
-                    setTransportFilters(transportFilters.filter(t => t !== transport));
-                  } else {
-                    setTransportFilters([...transportFilters, transport]);
-                  }
-                }}
-                size="small"
-              />
-            ))}
-
-            {/* Tier Filter - hide for deployed servers tab */}
-            {tabValue !== 1 && getAllTiers().map((tier) => (
-              <Chip
-                key={tier}
-                label={tier}
-                clickable
-                variant={tierFilters.includes(tier) ? 'filled' : 'outlined'}
-                color={tierFilters.includes(tier) ? 'secondary' : 'default'}
-                onClick={() => {
-                  if (tierFilters.includes(tier)) {
-                    setTierFilters(tierFilters.filter(t => t !== tier));
-                  } else {
-                    setTierFilters([...tierFilters, tier]);
-                  }
-                }}
-                size="small"
-              />
-            ))}
-
-            {/* Status Filter (only show for deployed servers tab) */}
-            {tabValue === 1 && getAllStatuses().map((status) => (
-              <Chip
-                key={status}
-                label={status}
-                clickable
-                variant={statusFilters.includes(status) ? 'filled' : 'outlined'}
-                color={statusFilters.includes(status) ? (status === 'Running' ? 'success' : 'error') : 'default'}
-                onClick={() => {
-                  if (statusFilters.includes(status)) {
-                    setStatusFilters(statusFilters.filter(s => s !== status));
-                  } else {
-                    setStatusFilters([...statusFilters, status]);
-                  }
-                }}
-                size="small"
-              />
-            ))}
-
-            {/* Clear Filters Button */}
-            {(searchQuery || transportFilters.length > 0 || tierFilters.length > 0 || statusFilters.length > 0) && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={clearFilters}
-                startIcon={<ClearIcon />}
-                sx={{ ml: 1 }}
-              >
-                Clear All
-              </Button>
-            )}
-          </Box>
-        </Box>
-
-        <Paper elevation={1}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              aria-label="registry server tabs"
-            >
-              <Tab label={`Available Servers (${filteredServers.length})`} {...a11yProps(0)} />
-              <Tab label={`Deployed Servers (${filteredDeployedServers.length})`} {...a11yProps(1)} />
-            </Tabs>
-          </Box>
-
-          <TabPanel value={tabValue} index={0}>
-            {serversLoading ? (
-              <Box display="flex" justifyContent="center">
-                <CircularProgress />
-              </Box>
-            ) : filteredServers.length === 0 ? (
-              <Alert severity="info">No servers available in this registry</Alert>
-            ) : (
-              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-                {filteredServers.map((server) => (
-                  <Card key={server.name} elevation={2}>
-                    <CardContent>
-                      {/* Title with Logo */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          mb: 1,
-                          cursor: 'pointer',
-                          '&:hover .server-title': { textDecoration: 'underline' }
-                        }}
-                        onClick={() => handleServerClick(server, false)}
-                      >
-                        {server.logoUrl && (
-                          <Box
-                            component="img"
-                            src={server.logoUrl}
-                            alt={`${server.name} logo`}
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 1,
-                              objectFit: 'contain',
-                              flexShrink: 0,
-                              backgroundColor: 'grey.50',
-                              border: '1px solid',
-                              borderColor: 'grey.200'
-                            }}
-                            onError={(e) => {
-                              // Hide logo if it fails to load
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <Typography
-                          variant="h6"
-                          className="server-title"
-                          sx={{
-                            color: 'primary.main',
-                            flex: 1,
-                            minWidth: 0 // Allow text to truncate
-                          }}
-                        >
-                          {getDisplayName(server.name)}
-                        </Typography>
-                      </Box>
-
-                      {/* Badges Row: Config badges on left, Status badges on right */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        {/* Left side: Configuration badges */}
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
-                          {server.tier && (
-                            <Tooltip title={`Tier: ${server.tier}`}>
-                              <Chip
-                                label={server.tier}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {server.transport && (
-                            <Tooltip title={`Transport: ${server.transport}`}>
-                              <Chip
-                                label={server.transport}
-                                size="small"
-                                color="secondary"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {(server.tools_count !== undefined && server.tools_count > 0) && (
-                            <Tooltip title={`Tools: ${server.tools_count} available`}>
-                              <Chip
-                                label={`${server.tools_count} tools`}
-                                size="small"
-                                color="info"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {server.tags && server.tags.length > 0 && server.tags.slice(0, 2).map((tag) => (
-                            <Chip key={tag} label={tag} size="small" />
-                          ))}
-                        </Box>
-
-                        {/* Right side: Status badges */}
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          {/* Available servers don't typically have status badges, this space is reserved for consistency */}
-                        </Box>
-                      </Box>
-
-                      {server.description && (
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                          {server.description}
-                        </Typography>
-                      )}
-
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {server.repository && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => window.open(server.repository, '_blank')}
-                            >
-                              Repository
-                            </Button>
-                          )}
-                        </Box>
-                        <Tooltip title="Show Manifest">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleShowServerManifest(server.name);
-                            }}
-                            disabled={loadingManifest}
-                            sx={{
-                              color: 'white',
-                              backgroundColor: 'primary.main',
-                              '&:hover': {
-                                backgroundColor: 'primary.dark',
-                                color: 'white',
-                              },
-                            }}
-                          >
-                            <ManifestIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Box>
-            )}
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={1}>
-            {deployedServersLoading ? (
-              <Box display="flex" justifyContent="center">
-                <CircularProgress />
-              </Box>
-            ) : filteredDeployedServers.length === 0 ? (
-              <Alert severity="info">No deployed servers for this registry</Alert>
-            ) : (
-              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-                {filteredDeployedServers.map((server) => (
-                  <Card key={server.name} elevation={2}>
-                    <CardContent>
-                      {/* Title with Logo */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          mb: 1,
-                          cursor: 'pointer',
-                          '&:hover .server-title': { textDecoration: 'underline' }
-                        }}
-                        onClick={() => handleServerClick(server, true)}
-                      >
-                        {server.logoUrl && (
-                          <Box
-                            component="img"
-                            src={server.logoUrl}
-                            alt={`${server.name} logo`}
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 1,
-                              objectFit: 'contain',
-                              flexShrink: 0,
-                              backgroundColor: 'grey.50',
-                              border: '1px solid',
-                              borderColor: 'grey.200'
-                            }}
-                            onError={(e) => {
-                              // Hide logo if it fails to load
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <Typography
-                          variant="h6"
-                          className="server-title"
-                          sx={{
-                            color: 'primary.main',
-                            flex: 1,
-                            minWidth: 0 // Allow text to truncate
-                          }}
-                        >
-                          {server.name}
-                        </Typography>
-                      </Box>
-
-                      {/* Badges Row: Config badges on left, Status badges on right */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        {/* Left side: Configuration badges */}
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowX: 'auto', flex: 1, mr: 1 }}>
-                          {server.transport && (
-                            <Tooltip title={`Transport: ${server.transport}`}>
-                              <Chip
-                                label={server.transport}
-                                size="small"
-                                color="secondary"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {server.tier && (
-                            <Tooltip title={`Tier: ${server.tier}`}>
-                              <Chip
-                                label={server.tier}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {(server.tools_count !== undefined && server.tools_count > 0) && (
-                            <Tooltip title={`Tools: ${server.tools_count} available`}>
-                              <Chip
-                                label={`${server.tools_count} tools`}
-                                size="small"
-                                color="info"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          )}
-                          {server.tags && server.tags.length > 0 && server.tags
-                            .filter(tag => tag.toLowerCase() !== 'deployed' && tag.toLowerCase() !== 'running')
-                            .slice(0, 2)
-                            .map((tag) => (
-                              <Chip key={tag} label={tag} size="small" />
-                            ))}
-                        </Box>
-
-                        {/* Right side: Status badges */}
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          {server.status && (
-                            <Tooltip title={`Status: ${server.status}`}>
-                              <Chip
-                                label={server.status}
-                                size="small"
-                                color={server.status === 'Running' ? 'success' : 'error'}
-                                variant="filled"
-                              />
-                            </Tooltip>
-                          )}
-                          {server.ready !== undefined && (
-                            <Tooltip title={server.ready ? 'Ready: Yes' : 'Ready: No'}>
-                              <Chip
-                                label={server.ready ? 'Ready' : 'Not Ready'}
-                                size="small"
-                                color={server.ready ? 'success' : 'warning'}
-                                variant="filled"
-                              />
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </Box>
-
-                      {(server.image || server.endpoint_url) && (
-                        <Box sx={{ mb: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                          {server.image && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: server.endpoint_url ? 1 : 0 }}>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  flex: 1,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  mr: 1
-                                }}
-                              >
-                                {server.image}{server.version && `:${server.version}`}
-                              </Typography>
-                              <Tooltip title="Copy Image">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyToClipboard(`${server.image}${server.version ? `:${server.version}` : ''}`);
-                                  }}
-                                >
-                                  <CopyIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          )}
-
-                          {server.endpoint_url && (
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  flex: 1,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  mr: 1
-                                }}
-                              >
-                                {server.endpoint_url}
-                              </Typography>
-                              <Tooltip title="Copy Endpoint">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyToClipboard(server.endpoint_url!);
-                                  }}
-                                >
-                                  <CopyIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {server.repository && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => window.open(server.repository, '_blank')}
-                            >
-                              Repository
-                            </Button>
-                          )}
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <Tooltip title="Show Manifest">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShowDeployedManifest(server);
-                              }}
-                              disabled={loadingManifest}
-                              sx={{
-                                color: 'white',
-                                backgroundColor: 'primary.main',
-                                '&:hover': {
-                                  backgroundColor: 'primary.dark',
-                                  color: 'white',
-                                },
-                              }}
-                            >
-                              <ManifestIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setServerToDelete(server);
-                              setDeleteConfirmOpen(true);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Box>
-            )}
-          </TabPanel>
-        </Paper>
-
-        {/* Server Details Dialog */}
-        <Dialog
+      {/* Server Details Dialog */}
+      <Dialog
           open={dialogOpen}
           onClose={handleDialogClose}
           maxWidth="md"
@@ -2330,15 +1378,6 @@ const RegistryDetailPage: React.FC = () => {
                     Documentation
                   </Button>
                 )}
-                {!selectedServer.endpoint_url && (
-                  <Button
-                    variant="contained"
-                    onClick={handleDeployServer}
-                    sx={{ ml: 'auto' }}
-                  >
-                    Deploy
-                  </Button>
-                )}
                 <Button onClick={handleDialogClose}>Close</Button>
               </DialogActions>
             </>
@@ -2404,16 +1443,27 @@ const RegistryDetailPage: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Manifest Viewer */}
-        {manifest && (
-          <ManifestViewer
-            open={manifestViewerOpen}
-            onClose={() => setManifestViewerOpen(false)}
-            title={manifestTitle}
-            manifest={manifest}
-          />
-        )}
-      </Container>
+      {/* Manifest Viewer */}
+      {manifest && (
+        <ManifestViewer
+          open={manifestViewerOpen}
+          onClose={() => setManifestViewerOpen(false)}
+          title={manifestTitle}
+          manifest={manifest}
+        />
+      )}
+
+      {/* Force Sync Confirmation Dialog */}
+      <ConfirmationDialog
+        open={detailForceSyncConfirmOpen}
+        title="Confirm Registry Sync"
+        message={`Are you sure you want to force sync the registry "${registry?.name || registryId}"? This will immediately pull the latest data from the registry source and may affect server availability during the sync process.`}
+        confirmLabel="Force Sync"
+        cancelLabel="Cancel"
+        onConfirm={confirmDetailForceSync}
+        onCancel={() => setDetailForceSyncConfirmOpen(false)}
+        severity="warning"
+      />
     </Box>
   );
 };

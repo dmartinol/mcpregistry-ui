@@ -12,6 +12,8 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -97,6 +99,9 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
   currentNamespace,
   onCreate,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [formData, setFormData] = useState<CreateMCPRegistryRequest>({
     name: '',
     displayName: '',
@@ -299,7 +304,13 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth={isMobile ? false : "md"}
+      fullWidth
+      fullScreen={isMobile}
+    >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">Create New Registry</Typography>
@@ -323,7 +334,16 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
             value={currentTab}
             onChange={handleTabChange}
             aria-label="create registry tabs"
-            sx={{ px: 2 }}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : false}
+            sx={{
+              px: 2,
+              '& .MuiTab-root': {
+                minWidth: isMobile ? 100 : 160,
+                fontSize: isMobile ? '0.875rem' : '1rem',
+                minHeight: isMobile ? 48 : 48
+              }
+            }}
           >
             <Tab
               label="General"
@@ -395,7 +415,15 @@ export const CreateRegistryDialog: React.FC<CreateRegistryDialogProps> = ({
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 1 : 0,
+        p: isMobile ? 2 : 1,
+        '& .MuiButton-root': {
+          minHeight: isMobile ? 48 : 36,
+          width: isMobile ? '100%' : 'auto'
+        }
+      }}>
         <Button onClick={handleClose} disabled={creating}>
           Cancel
         </Button>
