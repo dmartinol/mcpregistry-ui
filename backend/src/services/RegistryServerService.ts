@@ -131,6 +131,7 @@ export class RegistryServerService {
       // Only log errors in non-test environments to reduce test noise
       if (process.env.NODE_ENV !== 'test') {
         console.error(`Failed to fetch from registry ${registryId}:`, error);
+        console.log(`Registry API failed, attempting to fallback to ConfigMap storage for registry ${registryId}`);
       }
 
       // For test environments, provide empty response instead of throwing
@@ -138,7 +139,14 @@ export class RegistryServerService {
         return [];
       }
 
-      throw new Error(`Failed to fetch servers from registry ${registryId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Try to fallback to ConfigMap storage before throwing error
+      try {
+        console.log(`Attempting ConfigMap fallback for registry ${registryId}`);
+        return await this.fetchServersFromConfigMap(registryId);
+      } catch (configMapError) {
+        console.error(`ConfigMap fallback also failed for registry ${registryId}:`, configMapError);
+        throw new Error(`Failed to fetch servers from registry ${registryId}: API failed (${error instanceof Error ? error.message : 'Unknown error'}) and ConfigMap fallback failed (${configMapError instanceof Error ? configMapError.message : 'Unknown error'})`);
+      }
     }
   }
 
