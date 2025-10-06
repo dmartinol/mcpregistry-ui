@@ -172,9 +172,16 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
 
           <Button
             variant="contained"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={onCreateRegistry}
-            sx={{ minWidth: 140 }}
+            size="small"
+            sx={{
+              height: 32,
+              minWidth: 140,
+              fontSize: '0.8rem',
+              fontWeight: 600
+            }}
           >
             Create Registry
           </Button>
@@ -184,7 +191,12 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
             startIcon={<RefreshIcon />}
             onClick={onRefresh}
             disabled={refreshing}
-            sx={{ minWidth: 120 }}
+            size="small"
+            sx={{
+              height: 32,
+              minWidth: 120,
+              fontSize: '0.8rem'
+            }}
           >
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
@@ -252,6 +264,11 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                 startIcon={<ClearIcon />}
                 onClick={clearFilters}
                 size="small"
+                sx={{
+                  height: 32,
+                  minWidth: 80,
+                  fontSize: '0.8rem'
+                }}
               >
                 Clear
               </Button>
@@ -344,11 +361,13 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                           />
                         </Tooltip>
                       )}
-                      <Chip
-                        label={registry.status}
-                        color={getStatusColor(registry.status)}
-                        size="small"
-                      />
+                      <Tooltip title={`Registry Status: ${registry.status}`}>
+                        <Chip
+                          label={registry.status}
+                          color={getStatusColor(registry.status)}
+                          size="small"
+                        />
+                      </Tooltip>
                     </Box>
                   </Box>
 
@@ -444,13 +463,17 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Button
                         size="small"
                         variant="outlined"
                         startIcon={<SyncIcon />}
                         onClick={(e) => onForceSync(registry.id, e)}
-                        sx={{ minWidth: 100 }}
+                        sx={{
+                          height: 32,
+                          minWidth: 100,
+                          fontSize: '0.8rem'
+                        }}
                       >
                         Force Sync
                       </Button>
@@ -460,6 +483,8 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                           size="small"
                           onClick={() => onShowManifest(registry.id)}
                           sx={{
+                            width: 28,
+                            height: 28,
                             bgcolor: 'primary.main',
                             color: 'white',
                             '&:hover': { bgcolor: 'primary.dark' },
@@ -476,6 +501,10 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                         size="small"
                         onClick={() => toggleCardExpansion(registry.id)}
                         sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: 'action.selected',
+                          '&:hover': { bgcolor: 'action.hover' },
                           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                           transition: 'transform 0.3s ease',
                         }}
@@ -487,8 +516,10 @@ export const DesktopManagementInterface: React.FC<DesktopManagementInterfaceProp
                         size="small"
                         onClick={() => onDelete(registry)}
                         sx={{
+                          width: 28,
+                          height: 28,
                           color: 'error.main',
-                          '&:hover': { bgcolor: 'error.light' },
+                          '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
                         }}
                       >
                         <DeleteIcon fontSize="small" />

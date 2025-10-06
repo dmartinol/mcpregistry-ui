@@ -12,9 +12,6 @@ import {
   LinearProgress,
 } from '@mui/material';
 import {
-  Warning as WarningIcon,
-  Error as CriticalIcon,
-  Info as InfoIcon,
   Link as ConnectIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
@@ -25,6 +22,8 @@ interface MobileOrphanedServersViewProps {
   registries: Registry[];
   onConnect: (server: OrphanedServer) => void;
   onRefresh: () => void;
+  onServerClick?: (server: OrphanedServer) => void;
+  onShowManifest?: (server: OrphanedServer) => void;
   refreshing?: boolean;
   loading?: boolean;
 }
@@ -63,23 +62,6 @@ const getRiskLevel = (server: OrphanedServer): 'critical' | 'warning' | 'info' =
   return 'info';
 };
 
-const getRiskColor = (level: 'critical' | 'warning' | 'info') => {
-  switch (level) {
-    case 'critical': return 'error';
-    case 'warning': return 'warning';
-    case 'info': return 'info';
-    default: return 'info';
-  }
-};
-
-const getRiskIcon = (level: 'critical' | 'warning' | 'info') => {
-  switch (level) {
-    case 'critical': return <CriticalIcon fontSize="small" />;
-    case 'warning': return <WarningIcon fontSize="small" />;
-    case 'info': return <InfoIcon fontSize="small" />;
-    default: return <InfoIcon fontSize="small" />;
-  }
-};
 
 const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
@@ -101,6 +83,8 @@ export const MobileOrphanedServersView: React.FC<MobileOrphanedServersViewProps>
   registries,
   onConnect,
   onRefresh,
+  onServerClick,
+  onShowManifest: _onShowManifest,
   refreshing,
   loading,
 }) => {
@@ -113,8 +97,6 @@ export const MobileOrphanedServersView: React.FC<MobileOrphanedServersViewProps>
 
   const SimplifiedServerCard: React.FC<{ server: OrphanedServer }> = ({ server }) => {
     const riskLevel = getRiskLevel(server);
-    const riskColor = getRiskColor(riskLevel);
-    const riskIcon = getRiskIcon(riskLevel);
 
     return (
       <Card
@@ -133,9 +115,19 @@ export const MobileOrphanedServersView: React.FC<MobileOrphanedServersViewProps>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Box sx={{ color: `${riskColor}.main` }}>{riskIcon}</Box>
+                {/* Status Indicator Dot - Replace icon with dot */}
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: riskLevel === 'critical' ? 'error.main' : riskLevel === 'warning' ? 'warning.main' : 'info.main',
+                    flexShrink: 0,
+                  }}
+                />
                 <Typography
                   variant="subtitle2"
+                  onClick={() => onServerClick?.(server)}
                   sx={{
                     fontWeight: 600,
                     fontSize: '0.9rem',
@@ -143,6 +135,9 @@ export const MobileOrphanedServersView: React.FC<MobileOrphanedServersViewProps>
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     flex: 1,
+                    cursor: onServerClick ? 'pointer' : 'default',
+                    color: onServerClick ? 'primary.main' : 'text.primary',
+                    '&:hover': onServerClick ? { textDecoration: 'underline' } : {},
                   }}
                 >
                   {server.name}
@@ -164,7 +159,7 @@ export const MobileOrphanedServersView: React.FC<MobileOrphanedServersViewProps>
               </Box>
             </Box>
 
-            {/* Single Connect Action */}
+            {/* Action Buttons */}
             <Button
               size="small"
               variant="contained"

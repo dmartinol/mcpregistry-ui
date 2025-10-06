@@ -7,6 +7,7 @@ import {
   Chip,
   IconButton,
   useTheme,
+  Tooltip,
 } from '@mui/material';
 import {
   CheckCircle as RunningIcon,
@@ -16,7 +17,6 @@ import {
   Refresh as RestartIcon,
   Delete as DeleteIcon,
   CloudUpload as DeployIcon,
-  Visibility as ViewIcon,
   Star as StarIcon,
 } from '@mui/icons-material';
 
@@ -74,14 +74,6 @@ const getStatusColor = (server: Server, isDeployed: boolean): 'success' | 'warni
   return 'warning';
 };
 
-const getTierColor = (tier?: string): 'primary' | 'secondary' | 'warning' => {
-  switch (tier) {
-    case 'official': return 'primary';
-    case 'community': return 'secondary';
-    case '3rd-party': return 'warning';
-    default: return 'secondary';
-  }
-};
 
 export const MobileServerCard: React.FC<MobileServerCardProps> = ({
   server,
@@ -136,59 +128,86 @@ export const MobileServerCard: React.FC<MobileServerCardProps> = ({
                 }}
               />
             )}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  mb: 0.5,
-                }}
-              >
-                {server.name}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {statusIcon}
-                {isDeployed && (
-                  <Chip
-                    label={server.status || 'Unknown'}
-                    color={statusColor}
-                    size="small"
-                    sx={{ height: 18, fontSize: '0.65rem', fontWeight: 500 }}
-                  />
-                )}
-              </Box>
-            </Box>
+            <Typography
+              variant="subtitle2"
+              onClick={onView}
+              sx={{
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+                cursor: 'pointer',
+                color: 'primary.main',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {server.name}
+            </Typography>
           </Box>
 
-          {/* Quick Status Indicator */}
-          {needsAttention && (
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                bgcolor: 'warning.main',
-                flexShrink: 0,
-              }}
-            />
-          )}
+          {/* Right-side indicators */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {/* Status Indicator Dot */}
+            <Tooltip title={
+              isDeployed
+                ? `Status: ${server.status}${server.ready ? ' (Ready)' : ' (Not Ready)'}`
+                : `Availability: ${server.ready ? 'Ready' : 'Not Ready'}`
+            }>
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: isDeployed
+                    ? (server.status === 'Running' && server.ready ? 'success.main' : server.status === 'Pending' ? 'warning.main' : 'error.main')
+                    : (server.ready ? 'success.main' : 'grey.400'),
+                  flexShrink: 0,
+                }}
+              />
+            </Tooltip>
+
+            {/* Tier Badge */}
+            {server.tier && server.tier.toLowerCase() !== 'experimental' && (
+              <Tooltip title={`Tier: ${server.tier} Server`}>
+                <Chip
+                  label={server.tier.toLowerCase() === 'official' ? '⭐' : '👥'}
+                  size="small"
+                  sx={{
+                    minWidth: 20,
+                    height: 16,
+                    fontSize: '0.65rem',
+                    bgcolor: server.tier.toLowerCase() === 'official' ? '#fff3e0' : '#e3f2fd',
+                    color: server.tier.toLowerCase() === 'official' ? '#f57c00' : '#1976d2',
+                    border: '1px solid',
+                    borderColor: server.tier.toLowerCase() === 'official' ? '#ffb74d' : '#64b5f6',
+                    '& .MuiChip-label': {
+                      px: 0.25,
+                      fontWeight: 600
+                    }
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Box>
         </Box>
+
+        {/* Status Line for Mobile */}
+        {isDeployed && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+            {statusIcon}
+            <Chip
+              label={server.status || 'Unknown'}
+              color={statusColor}
+              size="small"
+              sx={{ height: 18, fontSize: '0.65rem', fontWeight: 500 }}
+            />
+          </Box>
+        )}
 
         {/* Badges Row */}
         <Box sx={{ display: 'flex', gap: 0.5, mb: 1.5, flexWrap: 'wrap' }}>
-          {server.tier && (
-            <Chip
-              label={server.tier}
-              color={getTierColor(server.tier)}
-              size="small"
-              variant="outlined"
-              sx={{ height: 20, fontSize: '0.65rem' }}
-            />
-          )}
           {server.transport && (
             <Chip
               label={server.transport}
@@ -302,20 +321,6 @@ export const MobileServerCard: React.FC<MobileServerCardProps> = ({
               </>
             )}
 
-            {/* View Details */}
-            <IconButton
-              size="small"
-              onClick={onView}
-              sx={{
-                bgcolor: 'action.selected',
-                color: 'text.primary',
-                '&:hover': { bgcolor: 'action.hover' },
-                minHeight: 32,
-                minWidth: 32,
-              }}
-            >
-              <ViewIcon fontSize="small" />
-            </IconButton>
           </Box>
 
           {/* Destructive Action */}

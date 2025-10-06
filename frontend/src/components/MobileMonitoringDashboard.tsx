@@ -7,7 +7,6 @@ import {
   Grid,
   Chip,
   IconButton,
-  Divider,
   LinearProgress,
   useTheme,
 } from '@mui/material';
@@ -16,7 +15,6 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   Refresh as RefreshIcon,
-  Visibility as ViewIcon,
   Sync as SyncIcon,
 } from '@mui/icons-material';
 import { Registry } from '../App';
@@ -205,6 +203,7 @@ export const MobileMonitoringDashboard: React.FC<MobileMonitoringDashboardProps>
                       {getStatusIcon(registry.status, registry.serverCount)}
                       <Typography
                         variant="subtitle1"
+                        onClick={() => onRegistryClick(registry.id)}
                         sx={{
                           fontWeight: 600,
                           fontSize: '1rem',
@@ -212,6 +211,11 @@ export const MobileMonitoringDashboard: React.FC<MobileMonitoringDashboardProps>
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           flex: 1,
+                          cursor: 'pointer',
+                          color: 'primary.main',
+                          '&:hover': {
+                            textDecoration: 'underline',
+                          },
                         }}
                       >
                         {registry.name}
@@ -231,6 +235,25 @@ export const MobileMonitoringDashboard: React.FC<MobileMonitoringDashboardProps>
                       </Typography>
                     </Box>
                   </Box>
+
+                  {/* Quick Action - Resync */}
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onForceSync(registry.id, e);
+                    }}
+                    sx={{
+                      color: 'primary.main',
+                      '&:hover': {
+                        bgcolor: 'primary.light',
+                        color: 'primary.dark',
+                      },
+                      ml: 1,
+                    }}
+                  >
+                    <SyncIcon fontSize="small" />
+                  </IconButton>
                 </Box>
 
                 {/* Sync Status */}
@@ -249,38 +272,6 @@ export const MobileMonitoringDashboard: React.FC<MobileMonitoringDashboardProps>
                   )}
                 </Box>
 
-                <Divider sx={{ my: 1.5 }} />
-
-                {/* Actions */}
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => onRegistryClick(registry.id)}
-                    sx={{
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                      minHeight: 36,
-                      minWidth: 36,
-                    }}
-                  >
-                    <ViewIcon fontSize="small" />
-                  </IconButton>
-
-                  <IconButton
-                    size="small"
-                    onClick={(e) => onForceSync(registry.id, e)}
-                    sx={{
-                      bgcolor: 'action.selected',
-                      color: 'text.primary',
-                      '&:hover': { bgcolor: 'action.hover' },
-                      minHeight: 36,
-                      minWidth: 36,
-                    }}
-                  >
-                    <SyncIcon fontSize="small" />
-                  </IconButton>
-                </Box>
               </CardContent>
             </Card>
           );

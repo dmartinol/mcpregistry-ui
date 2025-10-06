@@ -3,6 +3,7 @@ import { useTheme, useMediaQuery, Box, CircularProgress, Alert } from '@mui/mate
 import { MobileOrphanedServersView } from './MobileOrphanedServersView';
 import { OrphanedServersView } from './OrphanedServersView';
 import { ConnectToRegistryDialog } from './ConnectToRegistryDialog';
+import { OrphanedServerDialog } from './OrphanedServerDialog';
 import { api, OrphanedServer, ConnectToRegistryRequest, Registry } from '../services/api';
 
 interface ResponsiveOrphanedServersViewProps {
@@ -20,8 +21,9 @@ export const ResponsiveOrphanedServersView: React.FC<ResponsiveOrphanedServersVi
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Connect dialog state
+  // Dialog state
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState<OrphanedServer | null>(null);
 
   const loadData = useCallback(async () => {
@@ -65,6 +67,23 @@ export const ResponsiveOrphanedServersView: React.FC<ResponsiveOrphanedServersVi
   const handleConnectDialogClose = () => {
     setConnectDialogOpen(false);
     setSelectedServer(null);
+  };
+
+  const handleServerClick = (server: OrphanedServer) => {
+    // Show server details dialog (same as clicking server name)
+    setSelectedServer(server);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleShowManifest = (server: OrphanedServer) => {
+    // For orphaned servers, show details instead of manifest
+    handleServerClick(server);
+  };
+
+  const handleConnectFromDetails = () => {
+    // Close details dialog and open connect dialog with same server
+    setDetailsDialogOpen(false);
+    setConnectDialogOpen(true);
   };
 
   const handleConnectToRegistry = async (
@@ -119,8 +138,18 @@ export const ResponsiveOrphanedServersView: React.FC<ResponsiveOrphanedServersVi
           registries={registries}
           onConnect={handleConnect}
           onRefresh={handleRefresh}
+          onServerClick={handleServerClick}
+          onShowManifest={handleShowManifest}
           refreshing={refreshing}
           loading={loading}
+        />
+
+        {/* Server Details Dialog */}
+        <OrphanedServerDialog
+          open={detailsDialogOpen}
+          server={selectedServer}
+          onClose={() => setDetailsDialogOpen(false)}
+          onConnect={handleConnectFromDetails}
         />
 
         {/* Connect to Registry Dialog */}

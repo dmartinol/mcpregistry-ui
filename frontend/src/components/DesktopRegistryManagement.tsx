@@ -27,7 +27,6 @@ import {
   Refresh as RefreshIcon,
   Sync as SyncIcon,
   ExpandMore as ExpandIcon,
-  Visibility as ViewIcon,
   CloudUpload as DeployIcon,
   Code as ManifestIcon,
   Delete as DeleteIcon,
@@ -36,6 +35,7 @@ import {
   GitHub as GitIcon,
 } from '@mui/icons-material';
 import { Registry } from '../App';
+import { getDisplayName } from '../utils/displayNames';
 
 interface Server {
   name: string;
@@ -214,29 +214,16 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
           {/* CRITICAL TIER - Always Visible Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
-              {/* Status Indicator Dot */}
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: isDeployed
-                    ? (server.status === 'Running' ? 'success.main' : server.status === 'Pending' ? 'warning.main' : 'error.main')
-                    : (server.ready ? 'success.main' : 'grey.400'),
-                  flexShrink: 0,
-                }}
-              />
-
               {/* Logo */}
               {server.logoUrl && (
                 <Box
                   component="img"
                   src={server.logoUrl}
-                  alt=""
+                  alt={`${server.name} logo`}
                   sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 0.5,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 1,
                     objectFit: 'contain',
                     flexShrink: 0,
                     backgroundColor: 'grey.50',
@@ -266,30 +253,54 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                 }}
                 onClick={() => onServerClick(server, isDeployed)}
               >
-                {server.name}
+                {getDisplayName(server.name)}
               </Typography>
             </Box>
 
-            {/* Tier Badge - Only if official/community */}
-            {server.tier && server.tier.toLowerCase() !== 'experimental' && (
-              <Chip
-                label={server.tier.toLowerCase() === 'official' ? '⭐' : '👥'}
-                size="small"
-                sx={{
-                  minWidth: 28,
-                  height: 20,
-                  fontSize: '0.8rem',
-                  bgcolor: server.tier.toLowerCase() === 'official' ? '#fff3e0' : '#e3f2fd',
-                  color: server.tier.toLowerCase() === 'official' ? '#f57c00' : '#1976d2',
-                  border: '1px solid',
-                  borderColor: server.tier.toLowerCase() === 'official' ? '#ffb74d' : '#64b5f6',
-                  '& .MuiChip-label': {
-                    px: 0.5,
-                    fontWeight: 600
-                  }
-                }}
-              />
-            )}
+            {/* Right-side indicators */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Status Indicator Dot */}
+              <Tooltip title={
+                isDeployed
+                  ? `Status: ${server.status}${server.ready ? ' (Ready)' : ' (Not Ready)'}`
+                  : `Availability: ${server.ready ? 'Ready' : 'Not Ready'}`
+              }>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: isDeployed
+                      ? (server.status === 'Running' ? 'success.main' : server.status === 'Pending' ? 'warning.main' : 'error.main')
+                      : (server.ready ? 'success.main' : 'grey.400'),
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
+
+              {/* Tier Badge - Only if official/community */}
+              {server.tier && server.tier.toLowerCase() !== 'experimental' && (
+                <Tooltip title={`Tier: ${server.tier} Server`}>
+                  <Chip
+                    label={server.tier.toLowerCase() === 'official' ? '⭐' : '👥'}
+                    size="small"
+                    sx={{
+                      minWidth: 28,
+                      height: 20,
+                      fontSize: '0.8rem',
+                      bgcolor: server.tier.toLowerCase() === 'official' ? '#fff3e0' : '#e3f2fd',
+                      color: server.tier.toLowerCase() === 'official' ? '#f57c00' : '#1976d2',
+                      border: '1px solid',
+                      borderColor: server.tier.toLowerCase() === 'official' ? '#ffb74d' : '#64b5f6',
+                      '& .MuiChip-label': {
+                        px: 0.5,
+                        fontWeight: 600
+                      }
+                    }}
+                  />
+                </Tooltip>
+              )}
+            </Box>
           </Box>
 
           {/* CRITICAL TIER - Compact Status Line */}
@@ -439,30 +450,21 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                 <Button
                   size="small"
                   variant="contained"
+                  color="primary"
                   startIcon={<DeployIcon fontSize="small" />}
                   onClick={() => onQuickDeploy?.(server)}
-                  sx={{ minWidth: 80, height: 28, fontSize: '0.75rem' }}
+                  sx={{
+                    height: 32,
+                    minWidth: 100,
+                    fontSize: '0.8rem',
+                    fontWeight: 600
+                  }}
                 >
                   Deploy
                 </Button>
               )}
 
               {/* Secondary Actions - Icon Only */}
-              <Tooltip title="View Details">
-                <IconButton
-                  size="small"
-                  onClick={() => onServerClick(server, isDeployed)}
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    bgcolor: 'action.selected',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <ViewIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-
               <Tooltip title="View Manifest">
                 <IconButton
                   size="small"
@@ -470,9 +472,8 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                   sx={{
                     width: 28,
                     height: 28,
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    '&:hover': { bgcolor: 'primary.dark' },
+                    bgcolor: 'action.selected',
+                    '&:hover': { bgcolor: 'action.hover' },
                   }}
                 >
                   <ManifestIcon fontSize="small" />
@@ -486,8 +487,10 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                 size="small"
                 onClick={() => toggleCardExpansion(server.name)}
                 sx={{
-                  width: 24,
-                  height: 24,
+                  width: 28,
+                  height: 28,
+                  bgcolor: 'action.selected',
+                  '&:hover': { bgcolor: 'action.hover' },
                   transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.3s ease',
                 }}
@@ -501,8 +504,8 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
                   size="small"
                   onClick={() => onDeleteServer(server)}
                   sx={{
-                    width: 24,
-                    height: 24,
+                    width: 28,
+                    height: 28,
                     color: 'error.main',
                     '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
                     ml: 0.5
@@ -539,6 +542,12 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
             startIcon={<SyncIcon />}
             onClick={onForceSync}
             disabled={refreshing || registry.status === 'syncing'}
+            size="small"
+            sx={{
+              height: 32,
+              minWidth: 120,
+              fontSize: '0.8rem'
+            }}
           >
             Force Sync
           </Button>
@@ -547,6 +556,12 @@ export const DesktopRegistryManagement: React.FC<DesktopRegistryManagementProps>
             startIcon={<RefreshIcon />}
             onClick={onRefresh}
             disabled={refreshing}
+            size="small"
+            sx={{
+              height: 32,
+              minWidth: 120,
+              fontSize: '0.8rem'
+            }}
           >
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>

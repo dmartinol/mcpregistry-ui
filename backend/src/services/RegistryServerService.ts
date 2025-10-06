@@ -553,7 +553,10 @@ export class RegistryServerService {
         }
       }
 
-      return servers;
+      // Apply the same logo fetching logic that API endpoints use
+      const serversWithCompleteData = await this.supplementIncompleteServerData(registryId, servers);
+
+      return serversWithCompleteData;
     } catch (error) {
       console.error(`Failed to fetch from ConfigMap for registry ${registryId}:`, error);
 
@@ -920,12 +923,60 @@ export class RegistryServerService {
         return serverData;
       }
 
-      // If no raw server data found, return null
+      // If no raw server data found from API, try to fetch from ConfigMap
+      console.log(`API fetch failed, trying ConfigMap for server ${serverName} in registry ${registryId}`);
+      const configMapData = await this.fetchServerDataFromConfigMap(registryId, serverName);
+
+      if (configMapData) {
+        return configMapData;
+      }
+
+      // If no server data found anywhere, return null
       console.warn(`Server data not found for ${serverName} in registry ${registryId}`);
       return null;
 
     } catch (error) {
       console.warn(`Failed to fetch server data for ${serverName} from registry ${registryId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetches a specific server's data from ConfigMap storage
+   * @param registryId The registry identifier
+   * @param serverName The server name
+   * @returns Promise resolving to raw server data or null if not found
+   */
+  private async fetchServerDataFromConfigMap(registryId: string, serverName: string): Promise<object | null> {
+    try {
+      const { KubernetesClient } = await import('./KubernetesClient');
+      const k8sClient = new KubernetesClient();
+
+      // ConfigMap name pattern: {registryId}-registry-storage
+      const configMapName = `${registryId}-registry-storage`;
+      const namespace = 'toolhive-system';
+
+      console.log(`Fetching server ${serverName} from ConfigMap: ${configMapName} in namespace: ${namespace}`);
+
+      const configMap = await k8sClient.readConfigMap(configMapName, namespace);
+      const configMapData = configMap.data;
+
+      if (!configMapData || !configMapData['registry.json']) {
+        throw new Error(`No registry.json found in ConfigMap ${configMapName} in namespace ${namespace}`);
+      }
+
+      const registryData = JSON.parse(configMapData['registry.json']);
+
+      // Find the specific server
+      if (registryData.servers && registryData.servers[serverName]) {
+        console.log(`Found server ${serverName} in ConfigMap`);
+        return registryData.servers[serverName];
+      }
+
+      console.warn(`Server ${serverName} not found in ConfigMap ${configMapName}`);
+      return null;
+    } catch (error) {
+      console.error(`Failed to fetch server ${serverName} from ConfigMap for registry ${registryId}:`, error);
       return null;
     }
   }

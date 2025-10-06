@@ -180,17 +180,6 @@ export const ConnectToRegistryDialog: React.FC<ConnectToRegistryDialogProps> = (
           />
         </Box>
 
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            Technical Details:
-          </Typography>
-          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-            Namespace: {server.namespace}<br />
-            Transport: {server.transport}<br />
-            Image: {server.image}<br />
-            Status: {server.status}
-          </Typography>
-        </Box>
       </DialogContent>
 
       <DialogActions sx={{

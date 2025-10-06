@@ -8,12 +8,15 @@ import {
   IconButton,
   Tooltip,
   Button,
+  Collapse,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
-  Schedule as ClockIcon,
   Link as ConnectIcon,
   Code as ManifestIcon,
+  ExpandMore as ExpandIcon,
 } from '@mui/icons-material';
 import { ManifestViewer } from './ManifestViewer';
 import { getDisplayName } from '../utils/displayNames';
@@ -44,23 +47,13 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
   onClick,
   onShowManifest
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [manifestViewerOpen, setManifestViewerOpen] = useState(false);
   const [manifest, setManifest] = useState<object | null>(null);
   const [loadingManifest, setLoadingManifest] = useState(false);
-  const getStatusColor = (status: string): 'success' | 'warning' | 'error' | 'info' => {
-    switch (status) {
-      case 'Running':
-        return 'success';
-      case 'Pending':
-        return 'info';
-      case 'Failed':
-        return 'error';
-      case 'Terminating':
-        return 'warning';
-      default:
-        return 'info';
-    }
-  };
+  const [isExpanded, setIsExpanded] = useState(false);
+
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -120,131 +113,166 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
       onClick={onClick}
     >
       <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-        {/* Header with Name and Status */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Typography
-            variant="h6"
-            component="h3"
-            sx={{
-              fontWeight: 600,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              mr: 1
-            }}
-          >
-            {server.name}
-          </Typography>
-          <Chip
-            label="Unregistered"
-            size="small"
-            color="warning"
-            variant="filled"
-          />
-        </Box>
+        {/* CRITICAL TIER - Always Visible Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+            {/* Name - Clickable */}
+            <Typography
+              variant="subtitle1"
+              component="h3"
+              sx={{
+                cursor: onClick ? 'pointer' : 'default',
+                color: onClick ? 'primary.main' : 'text.primary',
+                '&:hover': onClick ? { textDecoration: 'underline' } : {},
+                flex: 1,
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.2,
+              }}
+              onClick={onClick}
+            >
+              {getDisplayName(server.name)}
+            </Typography>
+          </Box>
 
-        {/* Status and Transport Chips */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          <Chip
-            label={server.status}
-            size="small"
-            color={getStatusColor(server.status)}
-            variant="filled"
-          />
-          <Chip
-            label={server.transport}
-            size="small"
-            color="secondary"
-            variant="outlined"
-          />
-        </Box>
-
-        {/* Technical Details */}
-        <Box sx={{ mb: 2, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontFamily: 'monospace',
-              fontSize: '0.75rem',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              mb: server.url ? 1 : 0
-            }}
-          >
-            {server.image}
-          </Typography>
-          {server.url && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Typography
-                variant="body2"
+          {/* Right-side indicators */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Status Indicator Dot */}
+            <Tooltip title={`Server Status: ${server.status}`}>
+              <Box
                 sx={{
-                  fontSize: '0.75rem',
-                  fontFamily: 'monospace',
-                  flexGrow: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  mr: 1
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: server.status === 'Running' ? 'success.main' : server.status === 'Pending' ? 'warning.main' : 'error.main',
+                  flexShrink: 0,
                 }}
-              >
-                {server.url}
+              />
+            </Tooltip>
+
+            {/* Unregistered Badge */}
+            <Tooltip title="Unregistered Server">
+              <Chip
+                label="⚠️"
+                size="small"
+                sx={{
+                  minWidth: 28,
+                  height: 20,
+                  fontSize: '0.8rem',
+                  bgcolor: '#fff3e0',
+                  color: '#f57c00',
+                  border: '1px solid #ffb74d',
+                }}
+              />
+            </Tooltip>
+          </Box>
+        </Box>
+
+        {/* CRITICAL TIER - Compact Status Line */}
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            fontSize: '0.75rem',
+            lineHeight: 1.3,
+            mb: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.8,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Transport */}
+          <span style={{ fontWeight: 500 }}>{server.transport}</span>
+          <span>•</span>
+          {/* Port */}
+          <span>port {server.port}</span>
+          <span>•</span>
+          {/* Status */}
+          <span style={{
+            color: server.status === 'Running' ? '#2e7d32' : server.status === 'Pending' ? '#ed6c02' : '#d32f2f'
+          }}>
+            {server.status.toLowerCase()}
+          </span>
+          <span>•</span>
+          {/* Time */}
+          <span>{getTimeAgo(server.createdAt)}</span>
+        </Typography>
+
+        {/* TERTIARY TIER - Expandable Technical Details - Desktop Only */}
+        {!isMobile && (
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+          <Box sx={{ mb: 1.5, bgcolor: 'grey.50', borderRadius: 1, p: 1.5, fontSize: '0.8rem' }}>
+            {/* Image */}
+            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, minWidth: '50px' }}>
+                Image:
               </Typography>
-              <Tooltip title="Copy URL">
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
+                {server.image}
+              </Typography>
+              <Tooltip title="Copy Image">
                 <IconButton
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    copyToClipboard(server.url!);
+                    copyToClipboard(server.image);
                   }}
-                  aria-label="copy URL"
-                  sx={{ color: 'primary.main' }}
+                  sx={{ p: 0.25 }}
                 >
-                  <CopyIcon fontSize="small" />
+                  <CopyIcon fontSize="inherit" />
                 </IconButton>
               </Tooltip>
             </Box>
-          )}
-        </Box>
 
-        {/* Ports */}
-        <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              Port:
-            </Typography>
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-              {server.port}
-            </Typography>
+            {/* URL */}
+            {server.url && (
+              <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, minWidth: '50px' }}>
+                  URL:
+                </Typography>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
+                  {server.url}
+                </Typography>
+                <Tooltip title="Copy URL">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(server.url!);
+                    }}
+                    sx={{ p: 0.25 }}
+                  >
+                    <CopyIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
+
+            {/* Namespace & Ports */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                NS: {server.namespace}
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                Port: {server.port}→{server.targetPort}
+              </Typography>
+            </Box>
           </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              Target Port:
-            </Typography>
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-              {server.targetPort}
-            </Typography>
-          </Box>
-        </Box>
+        </Collapse>
+        )}
 
 
-        {/* Metadata */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Namespace: {server.namespace}
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <ClockIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-            <Typography variant="caption" color="text.secondary">
-              Created: {getTimeAgo(server.createdAt)}
-            </Typography>
-          </Box>
-        </Box>
-
-
-        {/* Connect to Registry Button and Manifest Icon */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+        {/* ACTION TIER - Smart Grouped Actions */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          pt: 0.5
+        }}>
+          {/* Primary Action */}
           <Button
             variant="contained"
             color="primary"
@@ -253,30 +281,62 @@ export const OrphanedServerCard: React.FC<OrphanedServerCardProps> = ({
               e.stopPropagation();
               onConnect(server);
             }}
-            sx={{ flex: 1, mr: onShowManifest ? 1 : 0 }}
+            size="small"
+            sx={{
+              height: 32,
+              minWidth: 100,
+              fontSize: '0.8rem',
+              fontWeight: 600
+            }}
           >
             Connect
           </Button>
-          {onShowManifest && (
-            <Tooltip title="Show Manifest">
-              <IconButton
-                size="small"
-                onClick={handleManifestClick}
-                disabled={loadingManifest}
-                aria-label="show manifest"
-                sx={{
-                  color: 'white',
-                  backgroundColor: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                    color: 'white',
-                  },
-                }}
-              >
-                <ManifestIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
+
+          {/* Secondary Actions */}
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            {/* Collapsible Details Button - Desktop Only */}
+            {!isMobile && (
+              <Tooltip title={isExpanded ? "Hide Details" : "Show Details"}>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(!isExpanded);
+                  }}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    bgcolor: 'action.selected',
+                    '&:hover': { bgcolor: 'action.hover' },
+                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease',
+                  }}
+                >
+                  <ExpandIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* View Manifest Button */}
+            {onShowManifest && (
+              <Tooltip title="View Manifest">
+                <IconButton
+                  size="small"
+                  onClick={handleManifestClick}
+                  disabled={loadingManifest}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    bgcolor: 'action.selected',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <ManifestIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+
+          </Box>
         </Box>
       </CardContent>
 

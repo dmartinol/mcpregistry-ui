@@ -16,7 +16,6 @@ import {
   Storage as StorageIcon,
   GitHub as GitIcon,
   Sync as SyncIcon,
-  Launch as LaunchIcon,
   Refresh as RefreshIcon,
   Delete as DeleteIcon,
   Code as ManifestIcon,
@@ -148,6 +147,10 @@ export const ModernRegistryCard: React.FC<ModernRegistryCardProps> = ({
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
+                  color: 'primary.main',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
                 }}
               >
                 {registry.name}
@@ -208,6 +211,23 @@ export const ModernRegistryCard: React.FC<ModernRegistryCardProps> = ({
               gap: 0.5,
               ml: 1,
             }}>
+              <IconButton
+                size="small"
+                onClick={(e) => handleActionClick(e, () => onForceSync(registry.id, e))}
+                disabled={isRefreshing}
+                sx={{
+                  color: 'primary.main',
+                  '&:hover': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.dark',
+                  },
+                  '&:disabled': {
+                    color: 'action.disabled',
+                  },
+                }}
+              >
+                <RefreshIcon fontSize="small" />
+              </IconButton>
               <IconButton
                 size="small"
                 onClick={handleExpandClick}
@@ -294,21 +314,6 @@ export const ModernRegistryCard: React.FC<ModernRegistryCardProps> = ({
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <IconButton
                 size="small"
-                onClick={(e) => handleActionClick(e, () => onForceSync(registry.id, e))}
-                disabled={isRefreshing}
-                sx={{
-                  bgcolor: 'primary.main',
-                  color: 'white',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  minHeight: 36,
-                  minWidth: 36,
-                }}
-              >
-                <RefreshIcon fontSize="small" />
-              </IconButton>
-
-              <IconButton
-                size="small"
                 onClick={(e) => handleActionClick(e, () => onShowManifest(registry.id))}
                 sx={{
                   bgcolor: 'action.selected',
@@ -319,20 +324,6 @@ export const ModernRegistryCard: React.FC<ModernRegistryCardProps> = ({
                 }}
               >
                 <ManifestIcon fontSize="small" />
-              </IconButton>
-
-              <IconButton
-                size="small"
-                onClick={(e) => handleActionClick(e, () => onRegistryClick(registry.id))}
-                sx={{
-                  bgcolor: 'action.selected',
-                  color: 'text.primary',
-                  '&:hover': { bgcolor: 'action.hover' },
-                  minHeight: 36,
-                  minWidth: 36,
-                }}
-              >
-                <LaunchIcon fontSize="small" />
               </IconButton>
             </Box>
 
